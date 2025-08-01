@@ -1,5 +1,5 @@
 """
-Application configuration management
+Application configuration management - Updated for complete data lake setup
 """
 
 from functools import lru_cache
@@ -70,9 +70,10 @@ class Settings(BaseSettings):
     s3_bucket: str = Field(..., description="S3 bucket name for data lake")
     s3_bronze_prefix: str = Field(default="data", description="Bronze layer prefix")
     s3_silver_prefix: str = Field(default="silver", description="Silver layer prefix")
+    s3_gold_prefix: str = Field(default="gold", description="Gold layer prefix")
     s3_scripts_bucket: str = Field(..., description="S3 bucket for Spark scripts")
 
-    # EMR settings
+    # EMR settings (optional)
     emr_cluster_id: Optional[str] = Field(default=None, description="EMR cluster ID")
     emr_service_role: str = Field(
         default="EMR_DefaultRole", description="EMR service role"
@@ -82,17 +83,21 @@ class Settings(BaseSettings):
     )
     emr_log_uri: Optional[str] = Field(default=None, description="EMR log URI")
 
-    # Glue settings
+    # Glue settings (required for data transformations)
     glue_job_name: str = Field(
-        default="data-transformation-job", description="Glue job name"
+        default="data-transformation-job", description="Glue job name prefix"
     )
     glue_service_role: str = Field(..., description="Glue service role ARN")
     glue_script_location: str = Field(..., description="S3 path to Glue script")
-    glue_temp_dir: str = Field(
-        default="s3://your-bucket/temp/", description="Glue temporary directory"
-    )
+    glue_temp_dir: str = Field(..., description="Glue temporary directory")
     glue_worker_type: str = Field(default="G.1X", description="Glue worker type")
     glue_number_of_workers: int = Field(default=5, description="Number of Glue workers")
+    glue_database_name: str = Field(
+        default="datalake_db", description="Glue Data Catalog database name"
+    )
+    glue_security_config: Optional[str] = Field(
+        default=None, description="Glue security configuration"
+    )
 
     # Spark settings
     spark_script_s3_path: str = Field(
@@ -101,9 +106,12 @@ class Settings(BaseSettings):
 
     # Job execution settings
     max_concurrent_jobs: int = Field(default=10, description="Maximum concurrent jobs")
-    job_timeout_minutes: int = Field(default=60, description="Job timeout in minutes")
+    job_timeout_minutes: int = Field(default=120, description="Job timeout in minutes")
     monitoring_interval_seconds: int = Field(
         default=30, description="Job monitoring interval"
+    )
+    job_cleanup_delay_minutes: int = Field(
+        default=5, description="Delay before cleaning up completed jobs"
     )
 
     # Rate limiting
@@ -118,6 +126,26 @@ class Settings(BaseSettings):
         default=50, description="Maximum column operations per transformation"
     )
     max_tags: int = Field(default=10, description="Maximum tags per transformation")
+    preview_sample_size: int = Field(
+        default=100, description="Default preview sample size"
+    )
+    max_preview_size: int = Field(
+        default=1000, description="Maximum preview sample size"
+    )
+
+    # Data lake specific settings
+    auto_catalog_sync: bool = Field(
+        default=True, description="Automatically sync data to Glue catalog"
+    )
+    enable_data_quality_checks: bool = Field(
+        default=True, description="Enable data quality validation"
+    )
+    enable_cost_estimation: bool = Field(
+        default=True, description="Enable cost estimation"
+    )
+    enable_metrics_collection: bool = Field(
+        default=True, description="Enable detailed metrics collection"
+    )
 
     @validator("log_level")
     def validate_log_level(cls, v):
@@ -142,6 +170,20 @@ class Settings(BaseSettings):
     def validate_port(cls, v):
         if not (1 <= v <= 65535):
             raise ValueError("port must be between 1 and 65535")
+        return v
+
+    @validator("glue_service_role")
+    def validate_glue_role(cls, v):
+        if not v.startswith("arn:aws:iam::"):
+            raise ValueError("glue_service_role must be a valid IAM role ARN")
+        return v
+
+    @validator("job_timeout_minutes")
+    def validate_job_timeout(cls, v):
+        if v < 5 or v > 2880:  # Max 48 hours
+            raise ValueError(
+                "job_timeout_minutes must be between 5 and 2880 (48 hours)"
+            )
         return v
 
     # Environment-specific configurations
@@ -192,6 +234,7 @@ class Settings(BaseSettings):
             "bucket": self.s3_bucket,
             "bronze_prefix": self.s3_bronze_prefix,
             "silver_prefix": self.s3_silver_prefix,
+            "gold_prefix": self.s3_gold_prefix,
             "scripts_bucket": self.s3_scripts_bucket,
         }
 
@@ -205,6 +248,8 @@ class Settings(BaseSettings):
             "temp_dir": self.glue_temp_dir,
             "worker_type": self.glue_worker_type,
             "number_of_workers": self.glue_number_of_workers,
+            "database_name": self.glue_database_name,
+            "security_config": self.glue_security_config,
         }
 
     @property
@@ -217,6 +262,19 @@ class Settings(BaseSettings):
             "log_uri": self.emr_log_uri,
         }
 
+    @property
+    def data_lake_config(self) -> dict:
+        """Get data lake specific configuration"""
+        return {
+            "auto_catalog_sync": self.auto_catalog_sync,
+            "enable_data_quality_checks": self.enable_data_quality_checks,
+            "enable_cost_estimation": self.enable_cost_estimation,
+            "enable_metrics_collection": self.enable_metrics_collection,
+            "preview_sample_size": self.preview_sample_size,
+            "max_preview_size": self.max_preview_size,
+            "job_cleanup_delay_minutes": self.job_cleanup_delay_minutes,
+        }
+
 
 class DevelopmentSettings(Settings):
     """Development environment settings"""
@@ -224,6 +282,8 @@ class DevelopmentSettings(Settings):
     debug: bool = True
     log_level: str = "DEBUG"
     allowed_hosts: List[str] = ["*"]
+    job_timeout_minutes: int = 60  # Shorter timeout for development
+    glue_number_of_workers: int = 2  # Fewer workers for development
 
 
 class ProductionSettings(Settings):
@@ -232,6 +292,8 @@ class ProductionSettings(Settings):
     debug: bool = False
     log_level: str = "INFO"
     workers: int = 4
+    job_timeout_minutes: int = 180  # 3 hours for production
+    glue_number_of_workers: int = 10  # More workers for production
 
     @validator("secret_key")
     def validate_secret_key_length(cls, v):
@@ -249,6 +311,11 @@ class TestSettings(Settings):
     log_level: str = "DEBUG"
     database_url: str = "sqlite+aiosqlite:///./test.db"
     redis_url: str = "redis://localhost:6379/1"  # Use different Redis DB for tests
+    job_timeout_minutes: int = 30  # Short timeout for tests
+    glue_number_of_workers: int = 2
+    auto_catalog_sync: bool = False  # Disable for tests
+    enable_data_quality_checks: bool = False
+    enable_cost_estimation: bool = False
 
 
 @lru_cache()
