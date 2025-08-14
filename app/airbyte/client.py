@@ -10,14 +10,12 @@ import httpx
 
 from app.config import get_settings
 
-
 @dataclass
 class AirbyteClientError(Exception):
     """Raised when the Airbyte API returns an error response."""
 
     status_code: int
     message: str
-
 
 class AirbyteClient:
     """Client for interacting with the Airbyte HTTP API."""
@@ -48,6 +46,16 @@ class AirbyteClient:
         data = await self._post("/workspaces/list")
         return data.get("workspaces", [])
 
+    async def list_source_definitions(self) -> list[dict]:
+        """Return available source connector definitions."""
+        data = await self._post("/source_definitions/list")
+        return data.get("sourceDefinitions", [])
+
+    async def list_destination_definitions(self) -> list[dict]:
+        """Return available destination connector definitions."""
+        data = await self._post("/destination_definitions/list")
+        return data.get("destinationDefinitions", [])
+
     async def create_source(self, payload: dict) -> dict:
         """Create a new source in Airbyte."""
         return await self._post("/sources/create", payload)
@@ -59,15 +67,6 @@ class AirbyteClient:
     async def create_connection(self, payload: dict) -> dict:
         """Create a connection between an existing source and destination."""
         return await self._post("/connections/create", payload)
-
-    async def trigger_sync(self, connection_id: str) -> dict:
-        """Trigger a sync for a given connection."""
-        return await self._post("/connections/sync", {"connectionId": connection_id})
-
-    async def get_job_status(self, job_id: int) -> dict:
-        """Retrieve status information for a sync job."""
-        return await self._post("/jobs/get", {"id": job_id})
-
 
 @asynccontextmanager
 async def get_airbyte_client() -> AsyncGenerator[AirbyteClient, None]:
