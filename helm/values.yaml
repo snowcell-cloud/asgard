@@ -1,0 +1,8 @@
+replicaCount: 2
+image:
+  repository: <your-docker-image>
+  tag: "latest"
+service:
+  type: ClusterIP
+  port: 80
+containerPort: 8000

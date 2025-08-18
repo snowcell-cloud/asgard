@@ -1,0 +1,4 @@
+apiVersion: v2
+name: asgard-app
+version: 0.1.0
+description: FastAPI wrapper around Airbyte API
