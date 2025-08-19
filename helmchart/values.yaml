@@ -1,8 +1,8 @@
-replicaCount: 2
+replicaCount: 1
 namespace: asgard
 image:
   repository: 637423187518.dkr.ecr.eu-north-1.amazonaws.com/asgard
-  tag: latest
+  tag: 
   pullPolicy: Always
 
 env:

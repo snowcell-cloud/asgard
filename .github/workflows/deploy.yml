@@ -12,7 +12,7 @@ jobs:
       AWS_REGION: eu-north-1
       ECR_REGISTRY: 637423187518.dkr.ecr.eu-north-1.amazonaws.com
       ECR_REPOSITORY: asgard
-      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_TAG: latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
