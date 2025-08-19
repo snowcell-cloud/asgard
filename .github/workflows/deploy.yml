@@ -50,7 +50,13 @@ jobs:
       - name: Setup kubeconfig
         run: |
           mkdir -p ~/.kube
-          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+          # Try to decode as base64, if it fails, treat as plain text
+          if echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config 2>/dev/null; then
+            echo "Kubeconfig decoded from base64"
+          else
+            echo "Using kubeconfig as plain text"
+            echo "${{ secrets.KUBECONFIG }}" > ~/.kube/config
+          fi
           chmod 600 ~/.kube/config
 
       - name: Deploy to Kubernetes with Helm
