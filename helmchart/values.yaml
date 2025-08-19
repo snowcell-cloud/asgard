@@ -47,7 +47,7 @@ publicIngress:
 autoscaling:
   enabled: false
   minReplicas: 1
-  maxReplicas: 2
+  maxReplicas: 1
   targetCPUUtilizationPercentage: 80
 
 resources:
@@ -64,8 +64,8 @@ tolerations: []
 
 affinity: {}
 
-envFrom:
-  - secretRef:
-      name: codeartifact-creds
-  - secretRef:
-      name: app-secrets
+# envFrom:
+#   - secretRef:
+#       name: codeartifact-creds
+#   - secretRef:
+#       name: app-secrets
