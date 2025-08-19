@@ -24,31 +24,23 @@ service:
 
 ingress:
   enabled: true
+  className: "nginx"
   annotations:
-    kubernetes.io/ingress.class: "alb"
-    alb.ingress.kubernetes.io/scheme: "internal"
-    alb.ingress.kubernetes.io/target-type: "ip"
-    alb.ingress.kubernetes.io/healthcheck-path: "/health"
-    alb.ingress.kubernetes.io/healthcheck-port: "8000"
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
-    alb.ingress.kubernetes.io/success-codes: "200-404"
-    alb.ingress.kubernetes.io/group.name: "asgard-api-dev-internal"
-  hosts: []
-  paths:
-    - path: /
-      pathType: Prefix
-      backend:
-        service:
-          name: asgard-app
-          port:
-            number: 80
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  hosts:
+    - host: asgard-app.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
 
 ## Note: this ingress is for public endpoints add all the paths under paths:, if there is no public path enabled: false
 publicIngress:
-  enabled: true
+  enabled: false
+  host: asgard-public.local
   paths:
     - /docs
-    - /jobs/docs
 
 autoscaling:
   enabled: false
