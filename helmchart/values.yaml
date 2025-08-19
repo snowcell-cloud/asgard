@@ -1,0 +1,77 @@
+replicaCount: 2
+namespace: asgard
+image:
+  repository: 637423187518.dkr.ecr.eu-north-1.amazonaws.com/asgard
+  tag: latest
+  pullPolicy: Always
+
+env:
+  ENVIRONMENT: "production"
+
+serviceAccount:
+  create: true
+  name: ""
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+      protocol: TCP
+
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: "internal"
+    alb.ingress.kubernetes.io/target-type: "ip"
+    alb.ingress.kubernetes.io/healthcheck-path: "/health"
+    alb.ingress.kubernetes.io/healthcheck-port: "8000"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/success-codes: "200-404"
+    alb.ingress.kubernetes.io/group.name: "asgard-api-dev-internal"
+  hosts: []
+  paths:
+    - path: /
+      pathType: Prefix
+      backend:
+        service:
+          name: asgard-app
+          port:
+            number: 80
+
+## Note: this ingress is for public endpoints add all the paths under paths:, if there is no public path enabled: false
+publicIngress:
+  enabled: true
+  paths:
+    - /docs
+    - /jobs/docs
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+envFrom:
+  - secretRef:
+      name: codeartifact-creds
+  - secretRef:
+      name: app-secrets

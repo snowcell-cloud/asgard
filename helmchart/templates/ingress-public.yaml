@@ -1,0 +1,33 @@
+{{- if .Values.publicIngress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-public-ingress
+  namespace: ingress-nginx
+  annotations:
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: http://localhost:3000, https://snowcell-staging.vercel.app, https://console-marketplace-staging.vercel.app, https://console-snowcite.vercel.app/
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, OPTIONS, PUT, DELETE"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    cert-manager.io/cluster-issuer: {{ .Values.publicIngress.clusterIssuer | default "auth-ingress-tls" | quote }}
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: {{ .Values.publicIngress.host }}
+      http:
+        paths:
+          {{- range .Values.publicIngress.paths }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service:
+                name: internal-alb-service
+                port:
+                  number: 80
+          {{- end }}
+  tls:
+    - hosts:
+        - {{ .Values.publicIngress.host }}
+      secretName: auth-ingress-tls
+{{- end }}
