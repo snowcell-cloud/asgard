@@ -26,12 +26,21 @@ class AirbyteClient:
     """Client for interacting with the Airbyte HTTP API."""
 
     def __init__(self, base_url: str | None = None):
-        logger.info(f"Initializing AirbyteClient with base_url: {base_url}")
         settings = get_settings()
         self.base_url = base_url or settings.airbyte_base_url
-        logger.info(f"Using Airbyte URL: {self.base_url}")
+        
+        logger.info(f"=== AirbyteClient Initialization ===")
+        logger.info(f"Environment: {getattr(settings, 'environment', 'not set')}")
+        logger.info(f"Requested base_url: {base_url}")
+        logger.info(f"Settings airbyte_base_url: {settings.airbyte_base_url}")
+        logger.info(f"Final base_url: {self.base_url}")
+        logger.info("=====================================")
+        
         # Create the httpx client immediately for non-async context manager usage
-        self._client = httpx.AsyncClient(base_url=self.base_url)
+        self._client = httpx.AsyncClient(
+            base_url=self.base_url,
+            timeout=30.0  # Add timeout for better error handling
+        )
         logger.debug("HTTP client initialized")
 
     async def __aenter__(self) -> "AirbyteClient":
