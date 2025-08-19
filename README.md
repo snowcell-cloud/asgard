@@ -3,7 +3,7 @@
 This service exposes a simplified HTTP API that proxies selected parts of the
 [Airbyte](https://airbyte.com) API. It provides three endpoints that let you
 register data sources and sinks in Airbyte and automatically connect them with a
-connection.
+connection .
 
 ## 🚀 Deployment
 
