@@ -47,10 +47,16 @@ jobs:
         with:
           version: latest
 
+      - name: Setup kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
       - name: Deploy to Kubernetes with Helm
-        env:
-          KUBECONFIG: ${{ secrets.KUBECONFIG }}
         run: |
           helm upgrade --install asgard-app ./helmchart \
             --set image.repository=$ECR_REGISTRY/$ECR_REPOSITORY \
-            --set image.tag=$IMAGE_TAG
+            --set image.tag=$IMAGE_TAG \
+            --namespace asgard \
+            --create-namespace
