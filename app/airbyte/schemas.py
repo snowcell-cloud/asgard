@@ -168,24 +168,49 @@ class DataSinkResponse(DataSinkPayload):
     id: str
 
 class IngestionPayload(BaseModel):
-    """Payload for linking an existing source to a sink."""
+    """Payload for creating a connection between an existing source and destination."""
 
-    source_id: str = Field(..., alias="sourceId")
-    sink_id: str = Field(..., alias="sinkId")
-    created: Optional[datetime] = None
-    updated: Optional[datetime] = None
+    sourceId: str = Field(..., example="95e66a59-8045-4307-9678-63bc3c9b8c93", description="ID of the source")
+    destinationId: str = Field(..., example="e478de0d-a3a0-475c-b019-25f7dd29e281", description="ID of the destination")
+    name: str = Field(..., example="Postgres-to-Bigquery", description="Name for the connection")
 
 class IngestionResponse(BaseModel):
-    """Response returned after creating an ingestion."""
+    """Response returned after creating an ingestion connection."""
 
-    id: str
-    source_id: str = Field(alias="sourceId")
-    sink_id: str = Field(alias="sinkId")
-    created: datetime
-    updated: datetime
+    connectionId: str = Field(..., description="Unique identifier for the created connection")
+    sourceId: str = Field(..., description="ID of the source")
+    destinationId: str = Field(..., description="ID of the destination") 
+    name: str = Field(..., description="Name of the connection")
+    status: str = Field(..., description="Status of the connection")
+    created: datetime = Field(..., description="Creation timestamp")
 
-    class Config:
-        populate_by_name = True
+class DataSourceListItem(BaseModel):
+    """Individual source item in the list response."""
+    
+    sourceId: str = Field(..., description="Unique identifier for the source")
+    name: str = Field(..., description="Name of the source")
+    sourceName: str = Field(..., description="Type name of the source connector")
+    workspaceId: str = Field(..., description="Workspace ID")
+
+class DataSourceListResponse(BaseModel):
+    """Response model for listing all sources."""
+    
+    sources: List[DataSourceListItem] = Field(..., description="List of sources")
+    total: int = Field(..., description="Total number of sources")
+
+class DataSinkListItem(BaseModel):
+    """Individual destination item in the list response."""
+    
+    destinationId: str = Field(..., description="Unique identifier for the destination")
+    name: str = Field(..., description="Name of the destination") 
+    destinationName: str = Field(..., description="Type name of the destination connector")
+    workspaceId: str = Field(..., description="Workspace ID")
+
+class DataSinkListResponse(BaseModel):
+    """Response model for listing all destinations."""
+    
+    destinations: List[DataSinkListItem] = Field(..., description="List of destinations")
+    total: int = Field(..., description="Total number of destinations")
 
 def get_destination_definition_id(dest_type: DataDestinationType) -> str:
     """Get the Airbyte destination definition ID for a given destination type."""

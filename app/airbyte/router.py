@@ -15,8 +15,10 @@ from app.airbyte.client import (
 from app.airbyte.schemas import (
     DataSinkPayload,
     DataSinkResponse,
+    DataSinkListResponse,
     DataSourcePayload,
     DataSourceResponse,
+    DataSourceListResponse,
     IngestionPayload,
     IngestionResponse,
     DataDestinationType,
@@ -62,48 +64,86 @@ async def _resolve_workspace_id(client: AirbyteClient, workspace_name: str | Non
     except Exception as e:
         logger.error(f"Error resolving workspace: {e}")
         raise
-
-# async def _get_source_definition_id(
-#     client: AirbyteClient, source_type: DataSourceType,
-#     workspace_id: str
-# ) -> str:
-#     logger.info(f"Getting source definition ID for type: {source_type}")
+ 
+@router.get("/datasource", response_model=DataSourceListResponse)
+async def get_all_datasources(
+    client: Annotated[AirbyteClient, Depends(get_airbyte_client_dependency)]
+) -> DataSourceListResponse:
+    """Get all created data sources."""
+    logger.info("Fetching all created data sources")
     
-#     try:
-#         defs = await client.list_source_definitions(workspace_id)
-#         logger.info(f"Found {len(defs) if defs else 0} source definitions")
+    try:
+        logger.debug("Step 1: Resolving workspace ID")
+        workspace_id = await _resolve_workspace_id(client)
         
-#         for d in defs:
-#             logger.debug(f"Checking definition: {d.get('name', 'Unknown')} - {d.get('sourceDefinitionId', 'No ID')}")
-#             if source_type.value.lower() in d["name"].lower():
-#                 definition_id = d["sourceDefinitionId"]
-#                 logger.info(f"Found matching source definition: {definition_id}")
-#                 return definition_id
+        logger.debug("Step 2: Fetching sources from Airbyte")
+        sources = await client.list_sources(workspace_id)
         
-#         logger.error(f"No definition found for source type: {source_type}")
-#         raise HTTPException(
-#             status_code=400, detail=f"unsupported source type: {source_type}"
-#         )
+        logger.info(f"Found {len(sources)} sources")
         
-#     except Exception as e:
-#         logger.error(f"Error fetching source definitions: {str(e)}")
-#         raise
+        # Transform the response to match our schema
+        source_items = []
+        for source in sources:
+            source_items.append({
+                "sourceId": source.get("sourceId", ""),
+                "name": source.get("name", ""),
+                "sourceName": source.get("sourceName", ""),
+                "workspaceId": source.get("workspaceId", workspace_id)
+            })
+        
+        result = DataSourceListResponse(
+            sources=source_items,
+            total=len(source_items)
+        )
+        logger.info(f"Successfully retrieved {result.total} data sources")
+        return result
+        
+    except AirbyteClientError as e:
+        logger.error(f"Airbyte API error: {e.status_code} - {e.message}")
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Unexpected error in get_all_datasources: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
-# ---------------------------------------------------------------------------
-# Public ingestion endpoints
-# ---------------------------------------------------------------------------
-
-@router.get("/sources")
-async def list_sources():
-    """List all available source types (optimized - no API call needed)."""
-    logger.info("Fetching available sources from pre-defined list")
-    return list_available_sources()
-
-@router.get("/destinations")
-async def list_destinations():
-    """List all available destination types (optimized - no API call needed)."""
-    logger.info("Fetching available destinations from pre-defined list")
-    return list_available_destinations()
+@router.get("/sink", response_model=DataSinkListResponse)
+async def get_all_sinks(
+    client: Annotated[AirbyteClient, Depends(get_airbyte_client_dependency)]
+) -> DataSinkListResponse:
+    """Get all created data sinks (destinations)."""
+    logger.info("Fetching all created data sinks")
+    
+    try:
+        logger.debug("Step 1: Resolving workspace ID")
+        workspace_id = await _resolve_workspace_id(client)
+        
+        logger.debug("Step 2: Fetching destinations from Airbyte")
+        destinations = await client.list_destinations(workspace_id)
+        
+        logger.info(f"Found {len(destinations)} destinations")
+        
+        # Transform the response to match our schema
+        destination_items = []
+        for destination in destinations:
+            destination_items.append({
+                "destinationId": destination.get("destinationId", ""),
+                "name": destination.get("name", ""),
+                "destinationName": destination.get("destinationName", ""),
+                "workspaceId": destination.get("workspaceId", workspace_id)
+            })
+        
+        result = DataSinkListResponse(
+            destinations=destination_items,
+            total=len(destination_items)
+        )
+        logger.info(f"Successfully retrieved {result.total} data sinks")
+        return result
+        
+    except AirbyteClientError as e:
+        logger.error(f"Airbyte API error: {e.status_code} - {e.message}")
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Unexpected error in get_all_sinks: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 @router.post("/datasource", response_model=DataSourceResponse, status_code=201)
 async def create_datasource(
@@ -198,26 +238,39 @@ async def create_ingestion(
     payload: IngestionPayload, 
     client: Annotated[AirbyteClient, Depends(get_airbyte_client_dependency)]
 ) -> IngestionResponse:
-    """Create a connection between an existing source and sink."""
+    """Create a connection between an existing source and destination."""
+    logger.info(f"Creating ingestion connection: {payload.name} (Source: {payload.sourceId} -> Destination: {payload.destinationId})")
 
-    conn_req = {
-        "sourceId": payload.source_id,
-        "destinationId": payload.sink_id,
-        "name": f"{payload.source_id}-{payload.sink_id}",
-        "syncCatalog": {"streams": []},
-    }
     try:
-        conn_result = await client.create_connection(conn_req)
-    except AirbyteClientError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.message)
+        logger.debug("Step 1: Preparing connection request")
+        conn_req = {
+            "sourceId": payload.sourceId,
+            "destinationId": payload.destinationId,
+            "name": payload.name,
+            "configurations": {
+                "streams": []
+            }
+        }
+        logger.info(f"Connection request prepared: {payload.name}")
 
-    now = datetime.utcnow()
-    created = payload.created or now
-    updated = payload.updated or now
-    return IngestionResponse(
-        id=str(conn_result["connectionId"]),
-        source_id=payload.source_id,
-        sink_id=payload.sink_id,
-        created=created,
-        updated=updated,
-    )
+        logger.debug("Step 2: Calling Airbyte create_connection API")
+        conn_result = await client.create_connection(conn_req)
+        logger.info(f"Connection created successfully: {conn_result.get('connectionId', 'Unknown ID')}")
+
+        result = IngestionResponse(
+            connectionId=conn_result["connectionId"],
+            sourceId=payload.sourceId,
+            destinationId=payload.destinationId,
+            name=payload.name,
+            status="active",
+            created=datetime.utcnow(),
+        )
+        logger.info(f"Successfully created ingestion connection with ID: {result.connectionId}")
+        return result
+        
+    except AirbyteClientError as e:
+        logger.error(f"Airbyte API error: {e.status_code} - {e.message}")
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Unexpected error in create_ingestion: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")

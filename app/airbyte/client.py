@@ -156,6 +156,30 @@ class AirbyteClient:
         """Create a new destination in Airbyte."""
         return await self._post("/destinations", payload)
 
+    async def list_sources(self, workspace_id: str) -> list[dict]:
+        """List all sources in a workspace."""
+        logger.info(f"Listing sources for workspace: {workspace_id}")
+        try:
+            result = await self._get("/sources")
+            sources = result.get("data", [])
+            logger.info(f"Found {len(sources)} sources")
+            return sources
+        except Exception as e:
+            logger.error(f"Error listing sources: {e}")
+            raise
+
+    async def list_destinations(self, workspace_id: str) -> list[dict]:
+        """List all destinations in a workspace."""
+        logger.info(f"Listing destinations for workspace: {workspace_id}")
+        try:
+            result = await self._get("/destinations")
+            destinations = result.get("data", [])
+            logger.info(f"Found {len(destinations)} destinations")
+            return destinations
+        except Exception as e:
+            logger.error(f"Error listing destinations: {e}")
+            raise
+
     async def create_connection(self, payload: dict) -> dict:
         """Create a connection between an existing source and destination."""
         return await self._post("/connections", payload)
