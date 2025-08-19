@@ -4,6 +4,8 @@ image:
   repository: 637423187518.dkr.ecr.eu-north-1.amazonaws.com/asgard
   tag: latest
   pullPolicy: Always
+  pullSecrets:
+    - ecr-secret
 
 env:
   ENVIRONMENT: "production"
