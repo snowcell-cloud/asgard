@@ -65,5 +65,4 @@ jobs:
             --set image.repository=$ECR_REGISTRY/$ECR_REPOSITORY \
             --set image.tag=$IMAGE_TAG \
             --namespace asgard \
-            --create-namespace
-            --force
+            --create-namespace --force
