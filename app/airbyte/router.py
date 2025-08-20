@@ -33,7 +33,7 @@ from app.airbyte.schemas import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(tags=["Data Ingestion"])
 
 async def _resolve_workspace_id(client: AirbyteClient, workspace_name: str | None = None) -> str:
     """Resolve workspace ID from name or get default workspace."""

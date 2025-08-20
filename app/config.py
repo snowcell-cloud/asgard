@@ -6,13 +6,26 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Application settings."""
     
-    # Environment-aware Airbyte URL configuration
+    # Environment-aware configuration
     environment: str = "development"  # development, production, or staging
     
-    # Default URLs for different environments
+    # Airbyte configuration
     airbyte_base_url: str = None
-    
     airbyte_workspace_id: Optional[str] = None
+    
+    # Airflow configuration
+    airflow_base_url: str = "http://localhost:8080"
+    airflow_api_base_url: str = "http://localhost:8080/api/v2"
+    airflow_bearer_token: Optional[str] = None
+    
+    # AWS/S3 configuration
+    aws_access_key_id: Optional[str] = None
+    aws_secret_access_key: Optional[str] = None
+    aws_region: str = "us-east-1"
+    
+    # Spark configuration
+    spark_app_name: str = "asgard-data-transform"
+    spark_master: str = "local[*]"
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="", case_sensitive=False)
     
