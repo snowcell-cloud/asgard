@@ -1,132 +1,264 @@
 """Pydantic models for Airbyte API payloads."""
 from __future__ import annotations
 
-from typing import Any, Optional
-from uuid import UUID
+from datetime import datetime
+from typing import Optional, Union, List, Dict, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr, validator, field_validator
+from enum import Enum
 
+# Pre-defined source definition mappings (extracted from Airbyte API)
+SOURCE_DEFINITIONS = {
+    "postgres": {
+        "id": "decd338e-5647-4c0b-adf4-da0e75f5a750",
+        "name": "Postgres",
+        "dockerRepository": "airbyte/source-postgres",
+        "dockerImageTag": "3.6.35"
+    },
+    "mysql": {
+        "id": "435bb9a5-7887-4809-aa58-28c27df0d7ad", 
+        "name": "MySQL",
+        "dockerRepository": "airbyte/source-mysql",
+        "dockerImageTag": "3.50.5"
+    },
+    "mongodb": {
+        "id": "b2e713cd-cc36-4c0a-b5bd-b47cb8a0561e",
+        "name": "MongoDb",
+        "dockerRepository": "airbyte/source-mongodb-v2", 
+        "dockerImageTag": "2.0.2"
+    }, 
+    "kafka": {
+        "id": "d917a47b-8537-4d0d-8c10-36a9928d4265",
+        "name": "Kafka", 
+        "dockerRepository": "airbyte/source-kafka",
+        "dockerImageTag": "0.4.2"
+    },
+}
+ 
 
-class Workspace(BaseModel):
-    """Representation of an Airbyte workspace."""
+# Pre-defined destination definition mappings
+DESTINATION_DEFINITIONS = {
+    "s3": {
+        "id": "4816b78f-1489-44c1-9060-4b19d5fa9362",
+        "name": "S3",
+        "dockerRepository": "airbyte/destination-s3",
+        "dockerImageTag": "0.3.17"
+    },
+}
 
-    workspace_id: UUID = Field(alias="workspaceId")
-    name: str
+class DataSourceType(str, Enum):
+    """Supported source connector types with their Airbyte definition IDs."""
 
-    class Config:
-        populate_by_name = True
+    POSTGRES = "postgres"
+    MYSQL = "mysql"
+    MONGODB = "mongodb"
+    KAFKA = "kafka"
+    
+     
+class DataDestinationType(str, Enum):
+    """Supported destination connector types."""
 
+    S3 = "s3"
 
-class ConnectionCreateRequest(BaseModel):
-    """Payload sent to Airbyte when creating a connection."""
+class PostgresConfig(BaseModel):
+    """Configuration for a Postgres connector."""
+    host: str = Field(..., example="localhost")
+    port: int = Field(5432, example=5432)
+    database: str = Field(..., example="postgres")
+    username: str = Field(..., example="postgres")
+    password: SecretStr = Field(..., example="password")
+    # schema: str = Field("public", example="public")
+    # ssl_mode: str = Field("prefer", example="prefer")
 
-    source_id: UUID = Field(alias="sourceId")
-    destination_id: UUID = Field(alias="destinationId")
-    name: str
-    sync_catalog: dict[str, Any] = Field(alias="syncCatalog")
-    schedule: Optional[dict[str, Any]] = None
-    status: Optional[str] = None
+    @validator("port")
+    def port_must_be_valid(cls, v: int) -> int:
+        if not 0 < v < 65536:
+            raise ValueError("Port must be between 1 and 65535")
+        return v
 
-    class Config:
-        populate_by_name = True
-        extra = "allow"
+class MySQLConfig(BaseModel):
+    """Configuration for a MySQL connector."""
 
+    host: str = Field(..., example="localhost")
+    port: int = Field(3306, example=3306)
+    database: str = Field(..., example="mysql_db")
+    username: str = Field(..., example="root")
+    password: SecretStr = Field(..., example="password")
+    # charset: str = Field("utf8mb4", example="utf8mb4")
 
-class ConnectionCreateResponse(BaseModel):
-    """Response returned after creating a connection."""
+    @validator("port")
+    def port_must_be_valid(cls, v: int) -> int:
+        if not 0 < v < 65536:
+            raise ValueError("Port must be between 1 and 65535")
+        return v
 
-    connection_id: UUID = Field(alias="connectionId")
+class KafkaConfig(BaseModel):
+    """Configuration for a Kafka connector."""
 
-    class Config:
-        populate_by_name = True
+    bootstrap_servers: List[str] = Field(..., example=["localhost:9092"])
+    security_protocol: str = Field("PLAINTEXT", example="PLAINTEXT")
+    topic: str = Field(..., example="my_topic")
+    group_id: Optional[str] = Field("default_group", example="my_group")
 
+class MongoDBConfig(BaseModel):
+    """Configuration for a MongoDB connector."""
 
-class SyncResponse(BaseModel):
-    """Response payload when a sync is triggered."""
+    connection_string: str = Field(..., example="mongodb://localhost:27017/")
+    database: str = Field(..., example="mydb")
+    auth_source: str = Field("admin", example="admin")
 
-    job_id: int = Field(alias="jobId")
+ 
+class S3Config(BaseModel):
+    """Configuration for an S3 destination connector."""
 
-    class Config:
-        populate_by_name = True
+    s3_bucket_name: str = Field(..., example="my-bucket")
+    s3_bucket_region: str = Field(..., example="us-east-1")
+    access_key_id: str = Field(..., example="AKIAIOSFODNN7EXAMPLE")
+    secret_access_key: SecretStr = Field(..., example="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
+    s3_bucket_path: str = Field("", example="exports/")
+    format: Dict[str, Any] = Field(
+        default={"format_type": "JSONL", "flattening": "Root level flattening"}, 
+        example={"format_type": "JSONL", "flattening": "Root level flattening"}
+    )
 
+class DataSourcePayload(BaseModel):
+    """Payload describing a data source using typed configs."""
+    name: str = Field(..., example="my_source")
+    type: DataSourceType
+    config: Union[
+        PostgresConfig,
+        MySQLConfig, 
+        KafkaConfig,
+        MongoDBConfig,
+        
+    ]
+    workspace: Optional[str] = Field(None, example="Default Workspace")
 
-class JobStatusResponse(BaseModel):
-    """Status information for a sync job."""
+class DataSourceResponse(BaseModel):
+    """Data source response returned from the API."""
 
-    job: dict[str, Any]
+    id: str = Field(..., example="12345678-1234-1234-1234-123456789012")
+    name: str = Field(..., example="my_source")
+    type: DataSourceType
+    config: Union[
+        PostgresConfig,
+        MySQLConfig,
+        KafkaConfig,
+        MongoDBConfig,
+        
+    ]
 
+class DataSinkPayload(BaseModel):
+    """Payload describing a data sink. Only S3 sinks are supported."""
 
-class SourceCreateRequest(BaseModel):
-    """Payload required to create a source."""
+    name: str = Field(..., example="my_sink")
+    type: DataDestinationType = Field(default=DataDestinationType.S3, example="s3")
+    config: S3Config
 
-    workspace_id: UUID = Field(alias="workspaceId")
-    source_definition_id: UUID = Field(alias="sourceDefinitionId")
-    name: str
-    connection_configuration: dict[str, Any] = Field(alias="connectionConfiguration")
+    @field_validator("type")
+    @classmethod
+    def ensure_s3(cls, v: DataDestinationType) -> DataDestinationType:
+        if v != DataDestinationType.S3:
+            raise ValueError("Only 's3' sinks are supported")
+        return v
 
-    class Config:
-        populate_by_name = True
+class DataSinkResponse(DataSinkPayload):
+    """Data sink payload returned from the API."""
 
+    id: str
 
-class SourceCreateResponse(BaseModel):
-    """Response returned after creating a source."""
+class IngestionPayload(BaseModel):
+    """Payload for creating a connection between an existing source and destination."""
 
-    source_id: UUID = Field(alias="sourceId")
+    sourceId: str = Field(..., example="95e66a59-8045-4307-9678-63bc3c9b8c93", description="ID of the source")
+    destinationId: str = Field(..., example="e478de0d-a3a0-475c-b019-25f7dd29e281", description="ID of the destination")
+    name: str = Field(..., example="Postgres-to-Bigquery", description="Name for the connection")
 
-    class Config:
-        populate_by_name = True
+class IngestionResponse(BaseModel):
+    """Response returned after creating an ingestion connection."""
 
+    connectionId: str = Field(..., description="Unique identifier for the created connection")
+    sourceId: str = Field(..., description="ID of the source")
+    destinationId: str = Field(..., description="ID of the destination") 
+    name: str = Field(..., description="Name of the connection")
+    status: str = Field(..., description="Status of the connection")
+    created: datetime = Field(..., description="Creation timestamp")
 
-class DestinationCreateRequest(BaseModel):
-    """Payload required to create a destination."""
+class DataSourceListItem(BaseModel):
+    """Individual source item in the list response."""
+    
+    sourceId: str = Field(..., description="Unique identifier for the source")
+    name: str = Field(..., description="Name of the source")
+    sourceName: str = Field(..., description="Type name of the source connector")
+    workspaceId: str = Field(..., description="Workspace ID")
 
-    workspace_id: UUID = Field(alias="workspaceId")
-    destination_definition_id: UUID = Field(alias="destinationDefinitionId")
-    name: str
-    connection_configuration: dict[str, Any] = Field(alias="connectionConfiguration")
+class DataSourceListResponse(BaseModel):
+    """Response model for listing all sources."""
+    
+    sources: List[DataSourceListItem] = Field(..., description="List of sources")
+    total: int = Field(..., description="Total number of sources")
 
-    class Config:
-        populate_by_name = True
+class DataSinkListItem(BaseModel):
+    """Individual destination item in the list response."""
+    
+    destinationId: str = Field(..., description="Unique identifier for the destination")
+    name: str = Field(..., description="Name of the destination") 
+    destinationName: str = Field(..., description="Type name of the destination connector")
+    workspaceId: str = Field(..., description="Workspace ID")
 
+class DataSinkListResponse(BaseModel):
+    """Response model for listing all destinations."""
+    
+    destinations: List[DataSinkListItem] = Field(..., description="List of destinations")
+    total: int = Field(..., description="Total number of destinations")
 
-class DestinationCreateResponse(BaseModel):
-    """Response returned after creating a destination."""
+def get_destination_definition_id(dest_type: DataDestinationType) -> str:
+    """Get the Airbyte destination definition ID for a given destination type."""
+    definition = DESTINATION_DEFINITIONS.get(dest_type.value)
+    if not definition:
+        raise ValueError(f"Unsupported destination type: {dest_type}")
+    return definition["id"]
 
-    destination_id: UUID = Field(alias="destinationId")
+def get_destination_definition(dest_type: DataDestinationType) -> Dict[str, str]:
+    """Get the complete destination definition for a given destination type."""
+    definition = DESTINATION_DEFINITIONS.get(dest_type.value)
+    if not definition:
+        raise ValueError(f"Unsupported destination type: {dest_type}")
+    return definition
 
-    class Config:
-        populate_by_name = True
+def list_available_destinations() -> List[Dict[str, str]]:
+    """List all available destination definitions."""
+    return [
+        {
+            "type": dest_type,
+            "name": definition["name"],
+            "id": definition["id"]
+        }
+        for dest_type, definition in DESTINATION_DEFINITIONS.items()
+    ]
 
+# Helper functions
+def get_source_definition_id(source_type: DataSourceType) -> str:
+    """Get the Airbyte source definition ID for a given source type."""
+    definition = SOURCE_DEFINITIONS.get(source_type.value)
+    if not definition:
+        raise ValueError(f"Unsupported source type: {source_type}")
+    return definition["id"]
 
-class ConnectionConfig(BaseModel):
-    """Connection settings used when composing a workflow."""
+def get_source_definition(source_type: DataSourceType) -> Dict[str, str]:
+    """Get the complete source definition for a given source type."""
+    definition = SOURCE_DEFINITIONS.get(source_type.value)
+    if not definition:
+        raise ValueError(f"Unsupported source type: {source_type}")
+    return definition
 
-    name: str
-    sync_catalog: dict[str, Any] = Field(alias="syncCatalog")
-    schedule: Optional[dict[str, Any]] = None
-    status: Optional[str] = None
-
-    class Config:
-        populate_by_name = True
-        extra = "allow"
-
-
-class WorkflowCreateRequest(BaseModel):
-    """Request body for creating a full data transfer workflow."""
-
-    source: SourceCreateRequest
-    destination: DestinationCreateRequest
-    connection: ConnectionConfig
-    trigger_sync: bool = False
-
-
-class WorkflowCreateResponse(BaseModel):
-    """Identifiers for objects created as part of a workflow."""
-
-    source_id: UUID = Field(alias="sourceId")
-    destination_id: UUID = Field(alias="destinationId")
-    connection_id: UUID = Field(alias="connectionId")
-    job_id: Optional[int] = Field(default=None, alias="jobId")
-
-    class Config:
-        populate_by_name = True
+def list_available_sources() -> List[Dict[str, str]]:
+    """List all available source definitions."""
+    return [
+        {
+            "type": source_type,
+            "name": definition["name"],
+            "id": definition["id"]
+        }
+        for source_type, definition in SOURCE_DEFINITIONS.items()
+    ]

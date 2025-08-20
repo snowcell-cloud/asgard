@@ -1,167 +1,276 @@
-"""FastAPI routes interacting with Airbyte."""
+"""FastAPI routes for simplified Airbyte interactions."""
+
+import logging
+from datetime import datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.config import get_settings
 from app.airbyte.client import (
     AirbyteClient,
     AirbyteClientError,
-    get_airbyte_client,
+    get_airbyte_client_dependency,
 )
 from app.airbyte.schemas import (
-    ConnectionCreateRequest,
-    ConnectionCreateResponse,
-    DestinationCreateRequest,
-    DestinationCreateResponse,
-    JobStatusResponse,
-    SourceCreateRequest,
-    SourceCreateResponse,
-    SyncResponse,
-    WorkflowCreateRequest,
-    WorkflowCreateResponse,
-    Workspace,
+    DataSinkPayload,
+    DataSinkResponse,
+    DataSinkListResponse,
+    DataSourcePayload,
+    DataSourceResponse,
+    DataSourceListResponse,
+    IngestionPayload,
+    IngestionResponse,
+    DataDestinationType,
+    DataSourceType,
+    get_source_definition_id,
+    get_destination_definition_id,
+    list_available_sources,
+    list_available_destinations,
 )
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-
-@router.get("/workspaces", response_model=list[Workspace])
-async def list_workspaces(
-    client: AirbyteClient = Depends(get_airbyte_client),
-) -> list[Workspace]:
-    """Return available workspaces."""
+async def _resolve_workspace_id(client: AirbyteClient, workspace_name: str | None = None) -> str:
+    """Resolve workspace ID from name or get default workspace."""
+    logger.info(f"Resolving workspace ID for: {workspace_name or 'default'}")
     try:
         workspaces = await client.list_workspaces()
-        return [Workspace.model_validate(ws) for ws in workspaces]
-    except AirbyteClientError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.message)
-    except Exception as exc:  # pragma: no cover - unexpected
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-
-@router.post(
-    "/connections",
-    response_model=ConnectionCreateResponse,
-    status_code=201,
-)
-async def create_connection(
-    payload: ConnectionCreateRequest,
-    client: AirbyteClient = Depends(get_airbyte_client),
-) -> ConnectionCreateResponse:
-    """Create a connection between existing source and destination."""
+        logger.debug(f"Found {len(workspaces)} workspaces")
+        
+        if not workspaces:
+            logger.error("No workspaces found in Airbyte")
+            raise HTTPException(status_code=404, detail="No workspaces found")
+        
+        if workspace_name:
+            # Find workspace by name
+            for ws in workspaces:
+                if ws.get("name") == workspace_name:
+                    workspace_id = ws.get("workspaceId")
+                    logger.info(f"Found workspace '{workspace_name}' with ID: {workspace_id}")
+                    return workspace_id
+            logger.error(f"Workspace '{workspace_name}' not found")
+            raise HTTPException(status_code=404, detail=f"Workspace '{workspace_name}' not found")
+        else:
+            # Use first workspace as default
+            default_ws = workspaces[0]
+            workspace_id = default_ws.get("workspaceId")
+            logger.info(f"Using default workspace: {default_ws.get('name')} (ID: {workspace_id})")
+            return workspace_id
+    except Exception as e:
+        logger.error(f"Error resolving workspace: {e}")
+        raise
+ 
+@router.get("/datasource", response_model=DataSourceListResponse)
+async def get_all_datasources(
+    client: Annotated[AirbyteClient, Depends(get_airbyte_client_dependency)]
+) -> DataSourceListResponse:
+    """Get all created data sources."""
+    logger.info("Fetching all created data sources")
+    
     try:
-        result = await client.create_connection(payload.model_dump(by_alias=True))
-        return ConnectionCreateResponse.model_validate(result)
-    except AirbyteClientError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.message)
-    except Exception as exc:  # pragma: no cover
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-
-@router.post(
-    "/sources",
-    response_model=SourceCreateResponse,
-    status_code=201,
-)
-async def create_source(
-    payload: SourceCreateRequest,
-    client: AirbyteClient = Depends(get_airbyte_client),
-) -> SourceCreateResponse:
-    """Create a new Airbyte source."""
-    try:
-        result = await client.create_source(payload.model_dump(by_alias=True))
-        return SourceCreateResponse.model_validate(result)
-    except AirbyteClientError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.message)
-    except Exception as exc:  # pragma: no cover
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-
-@router.post(
-    "/destinations",
-    response_model=DestinationCreateResponse,
-    status_code=201,
-)
-async def create_destination(
-    payload: DestinationCreateRequest,
-    client: AirbyteClient = Depends(get_airbyte_client),
-) -> DestinationCreateResponse:
-    """Create a new Airbyte destination."""
-    try:
-        result = await client.create_destination(payload.model_dump(by_alias=True))
-        return DestinationCreateResponse.model_validate(result)
-    except AirbyteClientError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.message)
-    except Exception as exc:  # pragma: no cover
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-
-@router.post(
-    "/connections/{connection_id}/sync",
-    response_model=SyncResponse,
-)
-async def trigger_sync(
-    connection_id: str,
-    client: AirbyteClient = Depends(get_airbyte_client),
-) -> SyncResponse:
-    """Trigger a sync job for the given connection."""
-    try:
-        result = await client.trigger_sync(connection_id)
-        return SyncResponse.model_validate(result)
-    except AirbyteClientError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.message)
-    except Exception as exc:  # pragma: no cover
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-
-@router.get("/jobs/{job_id}", response_model=JobStatusResponse)
-async def get_job_status(
-    job_id: int,
-    client: AirbyteClient = Depends(get_airbyte_client),
-) -> JobStatusResponse:
-    """Fetch the status of a previously triggered sync job."""
-    try:
-        result = await client.get_job_status(job_id)
-        return JobStatusResponse.model_validate(result)
-    except AirbyteClientError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.message)
-    except Exception as exc:  # pragma: no cover
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-
-@router.post(
-    "/workflows",
-    response_model=WorkflowCreateResponse,
-    status_code=201,
-)
-async def create_workflow(
-    payload: WorkflowCreateRequest,
-    client: AirbyteClient = Depends(get_airbyte_client),
-) -> WorkflowCreateResponse:
-    """Create a source, destination, connection, and optionally trigger a sync."""
-    try:
-        source = await client.create_source(payload.source.model_dump(by_alias=True))
-        destination = await client.create_destination(
-            payload.destination.model_dump(by_alias=True)
+        logger.debug("Step 1: Resolving workspace ID")
+        workspace_id = await _resolve_workspace_id(client)
+        
+        logger.debug("Step 2: Fetching sources from Airbyte")
+        sources = await client.list_sources(workspace_id)
+        
+        logger.info(f"Found {len(sources)} sources")
+        
+        # Transform the response to match our schema
+        source_items = []
+        for source in sources:
+            source_items.append({
+                "sourceId": source.get("sourceId", ""),
+                "name": source.get("name", ""),
+                "sourceName": source.get("sourceName", ""),
+                "workspaceId": source.get("workspaceId", workspace_id)
+            })
+        
+        result = DataSourceListResponse(
+            sources=source_items,
+            total=len(source_items)
         )
-        conn_payload = payload.connection.model_dump(by_alias=True)
-        conn_payload.update(
-            {
-                "sourceId": source["sourceId"],
-                "destinationId": destination["destinationId"],
+        logger.info(f"Successfully retrieved {result.total} data sources")
+        return result
+        
+    except AirbyteClientError as e:
+        logger.error(f"Airbyte API error: {e.status_code} - {e.message}")
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Unexpected error in get_all_datasources: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+
+@router.get("/sink", response_model=DataSinkListResponse)
+async def get_all_sinks(
+    client: Annotated[AirbyteClient, Depends(get_airbyte_client_dependency)]
+) -> DataSinkListResponse:
+    """Get all created data sinks (destinations)."""
+    logger.info("Fetching all created data sinks")
+    
+    try:
+        logger.debug("Step 1: Resolving workspace ID")
+        workspace_id = await _resolve_workspace_id(client)
+        
+        logger.debug("Step 2: Fetching destinations from Airbyte")
+        destinations = await client.list_destinations(workspace_id)
+        
+        logger.info(f"Found {len(destinations)} destinations")
+        
+        # Transform the response to match our schema
+        destination_items = []
+        for destination in destinations:
+            destination_items.append({
+                "destinationId": destination.get("destinationId", ""),
+                "name": destination.get("name", ""),
+                "destinationName": destination.get("destinationName", ""),
+                "workspaceId": destination.get("workspaceId", workspace_id)
+            })
+        
+        result = DataSinkListResponse(
+            destinations=destination_items,
+            total=len(destination_items)
+        )
+        logger.info(f"Successfully retrieved {result.total} data sinks")
+        return result
+        
+    except AirbyteClientError as e:
+        logger.error(f"Airbyte API error: {e.status_code} - {e.message}")
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Unexpected error in get_all_sinks: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+
+@router.post("/datasource", response_model=DataSourceResponse, status_code=201)
+async def create_datasource(
+    payload: DataSourcePayload, 
+    client: Annotated[AirbyteClient, Depends(get_airbyte_client_dependency)]
+) -> DataSourceResponse:
+    """Create a source via the Airbyte API."""
+    logger.info(f"Creating datasource: {payload.name} of type {payload.type}")
+
+    try:
+        logger.debug("Step 1: Resolving workspace ID")
+        workspace_id = await _resolve_workspace_id(client)
+        
+        logger.debug("Step 2: Getting source definition ID")
+        definition_id =  get_source_definition_id(  payload.type )
+
+        logger.debug("Step 3: Preparing Airbyte request")
+        req = {
+            "workspaceId": workspace_id,
+            "definitionId": definition_id,
+            "name": payload.name,
+            "configuration": payload.config.model_dump(mode="json"),
+        }
+        logger.info(f"Airbyte request prepared for source: {payload.name}")
+
+        logger.debug("Step 4: Calling Airbyte create_source API")
+        resp = await client.create_source(req)
+        logger.info(f"Airbyte response received: {resp.get('sourceId', 'Unknown ID')}")
+
+        result = DataSourceResponse(
+            id=resp["sourceId"],
+            name=payload.name,
+            type=payload.type,
+            config=payload.config,
+        )
+        logger.info(f"Successfully created datasource with ID: {result.id}")
+        return result
+        
+    except AirbyteClientError as e:
+        logger.error(f"Airbyte API error: {e.status_code} - {e.message}")
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Unexpected error in create_datasource: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+
+@router.post("/sink", response_model=DataSinkResponse, status_code=201)
+async def create_sink(
+    payload: DataSinkPayload, 
+    client: Annotated[AirbyteClient, Depends(get_airbyte_client_dependency)]
+) -> DataSinkResponse:
+    """Create a destination via the Airbyte API."""
+    logger.info(f"Creating sink: {payload.name} of type {payload.type}")
+
+    try:
+        logger.debug("Step 1: Resolving workspace ID")
+        workspace_id = await _resolve_workspace_id(client)
+        
+        logger.debug("Step 2: Getting destination definition ID")
+        definition_id = get_destination_definition_id(payload.type)
+
+        logger.debug("Step 3: Preparing Airbyte request")
+        req = {
+            "workspaceId": workspace_id,
+            "definitionId": definition_id,
+            "name": payload.name,
+            "configuration": payload.config.model_dump(mode="json"),
+        }
+        logger.info(f"Airbyte request prepared for destination: {payload.name}")
+
+        logger.debug("Step 4: Calling Airbyte create_destination API")
+        resp = await client.create_destination(req)
+        logger.info(f"Airbyte response received: {resp.get('destinationId', 'Unknown ID')}")
+
+        result = DataSinkResponse(
+            id=resp["destinationId"],
+            name=payload.name,
+            type=payload.type,
+            config=payload.config,
+        )
+        logger.info(f"Successfully created sink with ID: {result.id}")
+        return result
+        
+    except AirbyteClientError as e:
+        logger.error(f"Airbyte API error: {e.status_code} - {e.message}")
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Unexpected error in create_sink: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+
+@router.post("/ingestion", response_model=IngestionResponse, status_code=201)
+async def create_ingestion(
+    payload: IngestionPayload, 
+    client: Annotated[AirbyteClient, Depends(get_airbyte_client_dependency)]
+) -> IngestionResponse:
+    """Create a connection between an existing source and destination."""
+    logger.info(f"Creating ingestion connection: {payload.name} (Source: {payload.sourceId} -> Destination: {payload.destinationId})")
+
+    try:
+        logger.debug("Step 1: Preparing connection request")
+        conn_req = {
+            "sourceId": payload.sourceId,
+            "destinationId": payload.destinationId,
+            "name": payload.name,
+            "configurations": {
+                "streams": []
             }
+        }
+        logger.info(f"Connection request prepared: {payload.name}")
+
+        logger.debug("Step 2: Calling Airbyte create_connection API")
+        conn_result = await client.create_connection(conn_req)
+        logger.info(f"Connection created successfully: {conn_result.get('connectionId', 'Unknown ID')}")
+
+        result = IngestionResponse(
+            connectionId=conn_result["connectionId"],
+            sourceId=payload.sourceId,
+            destinationId=payload.destinationId,
+            name=payload.name,
+            status="active",
+            created=datetime.utcnow(),
         )
-        connection = await client.create_connection(conn_payload)
-        job_id = None
-        if payload.trigger_sync:
-            sync = await client.trigger_sync(str(connection["connectionId"]))
-            job_id = sync.get("jobId")
-        return WorkflowCreateResponse(
-            source_id=source["sourceId"],
-            destination_id=destination["destinationId"],
-            connection_id=connection["connectionId"],
-            job_id=job_id,
-        )
-    except AirbyteClientError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.message)
-    except Exception as exc:  # pragma: no cover
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        logger.info(f"Successfully created ingestion connection with ID: {result.connectionId}")
+        return result
+        
+    except AirbyteClientError as e:
+        logger.error(f"Airbyte API error: {e.status_code} - {e.message}")
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Unexpected error in create_ingestion: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
