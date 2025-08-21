@@ -60,28 +60,23 @@ The API will be available at:
 
 #### Submit a Transformation Job
 
-```bash
+**Note**: The transformation API now automatically uses registered Airbyte S3 sinks as data sources and creates destinations in the 'silver' folder.
+
+````bash
 curl -X POST "http://localhost:8001/transformation" \
      -H "Content-Type: application/json" \
      -d '{
-       "source": {
-         "bucket": "my-source-bucket",
-         "path": "data/input/"
-       },
-       "destination": {
-         "bucket": "my-dest-bucket",
-         "path": "data/output/"
-       },
        "sql_query": "SELECT customer_id, SUM(amount) as total FROM source_data GROUP BY customer_id",
-       "job_name": "Customer Aggregation"
+       "source_format": "parquet",
+       "destination_format": "parquet",
+       "job_name": "Customer Aggregation",
+       "description": "Aggregate customer data from bronze to silver layer"
      }'
-```
-
-#### Check Job Status
+```#### Check Job Status
 
 ```bash
 curl "http://localhost:8001/transformation/{job_id}"
-```
+````
 
 #### List All Jobs
 
@@ -150,10 +145,10 @@ curl "http://localhost:8001/datasource"
 curl "http://localhost:8001/sink"
 ```
 
- 
 ## 📋 API Endpoints
 
 ### Transformation API (Airflow Integration)
+
 - `GET /health` - Health check
 - `POST /transformation` - Submit transformation job
 - `GET /transformation/{job_id}` - Get job status
@@ -186,16 +181,12 @@ curl "http://localhost:8001/sink"
 
 ### Request Schema
 
+````json
+### Request Schema
+
+#### Transformation Request (Simplified)
 ```json
 {
-  "source": {
-    "bucket": "string",
-    "path": "string"
-  },
-  "destination": {
-    "bucket": "string",
-    "path": "string"
-  },
   "sql_query": "string",
   "source_format": "parquet",
   "destination_format": "parquet",
@@ -203,8 +194,25 @@ curl "http://localhost:8001/sink"
   "description": "string",
   "spark_options": {}
 }
+````
 
+**Note**: Source and destination are automatically determined from registered Airbyte S3 sinks. The system uses the first available S3 sink as the source location and creates the destination in the same bucket under the 'silver/' folder.
+
+#### Data Source/Sink Request
+
+```json
+{
+  "source_type": "postgres|mysql|mongodb|kafka",
+  "destination_type": "s3",
+  "workspace_name": "default",
+  "config": {
+    "s3_bucket_name": "string",
+    "s3_bucket_path": "string"
+  },
+  "name": "string"
+}
 ```
+
 ## 🏗️ Architecture
 
 ### Data Transformation Pipeline
@@ -222,7 +230,9 @@ Client Request → FastAPI → Airbyte API → Data Sources → Data Sinks
 ### Unified Workflow
 
 ```
-Data Sources → Airbyte Ingestion → S3 Storage → Airflow Transformation → Final Output
+1. Data Sources → Airbyte Ingestion → S3 Bronze Layer
+2. S3 Bronze Layer → Airflow Transformation → S3 Silver Layer
+3. S3 Silver Layer → Further Processing → S3 Gold Layer
 ```
 
 The platform provides:
@@ -236,11 +246,19 @@ The platform provides:
 
 #### Airflow Integration:
 
-1. Receives transformation requests via REST API
-2. Converts them to Airflow DAG configurations
-3. Triggers Airflow DAGs using Bearer token authentication
-4. Tracks job status through Airflow REST API
-5. Returns job status and results
+1. **Automatic Source Detection**: Uses registered Airbyte S3 sinks as transformation sources
+2. **Medallion Architecture**: Automatically creates 'silver' layer destinations
+3. Converts SQL queries to Airflow DAG configurations
+4. Triggers Airflow DAGs using Bearer token authentication
+5. Tracks job status through Airflow REST API
+6. Returns job status and results
+
+#### Typical Workflow:
+
+1. **Bronze Layer**: Register S3 sink via `/sink` endpoint → Ingest raw data via Airbyte
+2. **Silver Layer**: Submit transformation job via `/transformation` → Process data with Spark/Airflow
+3. **Gold Layer**: Run additional transformations for analytics-ready data
+4. Returns job status and results
 
 ## 📁 Project Structure
 
@@ -262,5 +280,3 @@ asgard-dev/
 - Basic SQL injection protection
 - Environment-based configuration
 - No sensitive data in code
-
- 

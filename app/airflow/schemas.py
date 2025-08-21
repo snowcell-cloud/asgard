@@ -44,8 +44,6 @@ class S3Location(BaseModel):
 
 class TransformationRequest(BaseModel):
     """Request model for data transformation."""
-    source: S3Location = Field(..., description="Source S3 location")
-    destination: S3Location = Field(..., description="Destination S3 location")
     sql_query: str = Field(..., description="SQL query for transformation")
     
     # Optional parameters
