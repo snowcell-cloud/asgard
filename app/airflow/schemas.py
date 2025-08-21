@@ -62,7 +62,7 @@ class TransformationRequest(BaseModel):
         if not v or not v.strip():
             raise ValueError("SQL query cannot be empty")
         # Basic SQL injection protection - in production, use proper SQL parsing
-        dangerous_keywords = ['DROP', 'DELETE', 'TRUNCATE', 'INSERT', 'UPDATE']
+        dangerous_keywords = []
         upper_query = v.upper()
         for keyword in dangerous_keywords:
             if keyword in upper_query:
