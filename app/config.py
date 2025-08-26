@@ -22,7 +22,12 @@ class Settings(BaseSettings):
     spark_app_name: str = "asgard-data-transform"
     spark_master: str = "local[*]"
 
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="", case_sensitive=False)
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        env_prefix="", 
+        case_sensitive=False,
+        extra="ignore"  # Ignore extra environment variables
+    )
     
     def __post_init__(self):
         """Set airbyte_base_url based on environment if not explicitly set."""

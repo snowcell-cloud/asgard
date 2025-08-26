@@ -55,7 +55,7 @@ async def _get_s3_destinations(airbyte_client: AirbyteClient) -> list[dict]:
         # Filter for S3 destinations only
         s3_destinations = []
         for dest in destinations:
-            if dest.get("destinationName", "").lower() == "s3":
+            if dest.get("name", "").lower() == "s3":
                 s3_destinations.append(dest)
         
         if not s3_destinations:

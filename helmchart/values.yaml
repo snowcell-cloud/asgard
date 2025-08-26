@@ -17,7 +17,7 @@ env:
  
 serviceAccount:
   create: true
-  name: ""
+  name: "asgard-app"
 
 service:
   type: LoadBalancer
