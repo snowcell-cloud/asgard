@@ -3,7 +3,7 @@
 A comprehensive FastAPI wrapper for data operations including:
 
 - **Airbyte Integration**: Simplified data source and sink management for data ingestion
-- **Airflow Transformations**: Spark-based data transformations through Airflow API
+- **Spark Transformations**: Kubernetes-based data transformations using SparkOperator
 
 This platform provides unified REST interfaces to manage your entire data pipeline from ingestion to transformation.
 
@@ -13,9 +13,8 @@ This platform provides unified REST interfaces to manage your entire data pipeli
 
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/) package manager
-- Running Airflow instance with API access
-- Valid Airflow Bearer token
-- Running Airbyte instance (optional, for data ingestion features)
+- Running Airbyte instance (for data ingestion features)
+- Kubernetes cluster with SparkOperator (for transformations)
 
 ### 1. Setup
 
@@ -26,7 +25,7 @@ cd asgard-dev
 
 # Set up environment variables
 cp .env.example .env
-# Edit .env with your Airflow Bearer token
+# Edit .env with your service configuration
 
 # Sync dependencies
 uv sync
@@ -37,13 +36,14 @@ uv sync
 Update `.env` with your service details:
 
 ```bash
-# Airflow Configuration
-AIRFLOW_BASE_URL=http://localhost:8080
-AIRFLOW_API_BASE_URL=http://localhost:8080/api/v2
-AIRFLOW_BEARER_TOKEN=your_actual_bearer_token_here
-
 # Airbyte Configuration
 AIRBYTE_BASE_URL=http://localhost:8000
+
+# Kubernetes Configuration (for Spark transformations)
+PIPELINE_NAMESPACE=asgard
+SPARK_IMAGE=your-registry/spark-custom:latest
+SPARK_SERVICE_ACCOUNT=spark-sa
+S3_SECRET_NAME=s3-credentials
 ```
 
 ### 3. Start the API
@@ -56,32 +56,32 @@ The API will be available at:
 
 ## 📖 API Usage
 
-### Airflow Transformations
+### Spark Transformations
 
-#### Submit a Transformation Job
+#### Submit a Spark Transformation Job
 
-**Note**: The transformation API now automatically uses registered Airbyte S3 sinks as data sources and creates destinations in the 'silver' folder.
+**Note**: The `/transform` API automatically detects source and destination from Airbyte S3 sinks. All Spark configuration has sensible defaults.
 
-````bash
-curl -X POST "http://localhost:8001/transformation" \
+```bash
+curl -X POST "http://localhost:8001/transform" \
      -H "Content-Type: application/json" \
      -d '{
-       "sql_query": "SELECT customer_id, SUM(amount) as total FROM source_data GROUP BY customer_id",
-       "source_format": "parquet",
-       "destination_format": "parquet",
-       "job_name": "Customer Aggregation",
-       "description": "Aggregate customer data from bronze to silver layer"
+       "sql": "SELECT customer_id, SUM(amount) as total_amount FROM source_data GROUP BY customer_id"
      }'
-```#### Check Job Status
+```
+
+**Optional**: You can still override Spark configuration if needed:
 
 ```bash
-curl "http://localhost:8001/transformation/{job_id}"
-````
+curl -X POST "http://localhost:8001/transform" \
+     -H "Content-Type: application/json" \
+     -d '{
 
-#### List All Jobs
-
-```bash
-curl "http://localhost:8001/transformation"
+       "sql": "SELECT customer_id, SUM(amount) as total_amount FROM source_data GROUP BY customer_id",
+       "write_mode": "overwrite",
+       "executor_instances": 4,
+       "executor_memory": "8g"
+     }'
 ```
 
 ### Airbyte Data Integration
@@ -150,11 +150,10 @@ curl "http://localhost:8001/sink"
 ### Transformation API (Airflow Integration)
 
 - `GET /health` - Health check
-- `POST /transformation` - Submit transformation job
-- `GET /transformation/{job_id}` - Get job status
-- `GET /transformation` - List jobs
-- `GET /transformation/health/status` - Service health
-- `GET /transformation/dags/list` - List Airflow DAGs
+
+### Spark Transformation API (Kubernetes Integration)
+
+- `POST /transform` - Submit Spark transformation job (auto-detects source/destination)
 
 ### Airbyte Integration API
 
@@ -172,31 +171,41 @@ curl "http://localhost:8001/sink"
 
 ### Environment Variables
 
-| Variable               | Description       | Default                        |
-| ---------------------- | ----------------- | ------------------------------ |
-| `AIRFLOW_BASE_URL`     | Airflow base URL  | `http://localhost:8080`        |
-| `AIRFLOW_API_BASE_URL` | Airflow API URL   | `http://localhost:8080/api/v2` |
-| `AIRFLOW_BEARER_TOKEN` | Airflow API token | Required                       |
-| `AIRBYTE_BASE_URL`     | Airbyte base URL  | `http://localhost:8000`        |
+| Variable                | Description                          | Default                 |
+| ----------------------- | ------------------------------------ | ----------------------- |
+| `AIRBYTE_BASE_URL`      | Airbyte base URL                     | `http://localhost:8000` |
+| `PIPELINE_NAMESPACE`    | Kubernetes namespace for Spark jobs  | `asgard`                |
+| `SPARK_IMAGE`           | Docker image for Spark jobs          | Required                |
+| `SPARK_SERVICE_ACCOUNT` | Kubernetes service account           | `spark-sa`              |
+| `S3_SECRET_NAME`        | Kubernetes secret for S3 credentials | `s3-credentials`        |
 
 ### Request Schema
 
-````json
-### Request Schema
+#### Spark Transformation Request (Kubernetes)
 
-#### Transformation Request (Simplified)
+**Minimal Request** (recommended):
+
 ```json
 {
-  "sql_query": "string",
-  "source_format": "parquet",
-  "destination_format": "parquet",
-  "job_name": "string",
-  "description": "string",
-  "spark_options": {}
+  "sql": "string"
 }
-````
+```
 
-**Note**: Source and destination are automatically determined from registered Airbyte S3 sinks. The system uses the first available S3 sink as the source location and creates the destination in the same bucket under the 'silver/' folder.
+**With Optional Spark Configuration** (all have sensible defaults):
+
+```json
+{
+  "sql": "string",
+  "write_mode": "overwrite|append",
+  "executor_instances": 2,
+  "executor_cores": 2,
+  "executor_memory": "4g",
+  "driver_cores": 1,
+  "driver_memory": "2g"
+}
+```
+
+**Note**: Both transformation APIs automatically determine source and destination from registered Airbyte S3 sinks. The system uses the first available S3 sink as the source location and creates the destination in the same bucket under the 'silver/' folder.
 
 #### Data Source/Sink Request
 
@@ -218,7 +227,7 @@ curl "http://localhost:8001/sink"
 ### Data Transformation Pipeline
 
 ```
-Client Request → FastAPI → Airflow REST API → Spark DAG → S3 Output
+Client Request → FastAPI → Kubernetes → SparkApplication → S3 Output
 ```
 
 ### Data Ingestion Pipeline
@@ -231,7 +240,7 @@ Client Request → FastAPI → Airbyte API → Data Sources → Data Sinks
 
 ```
 1. Data Sources → Airbyte Ingestion → S3 Bronze Layer
-2. S3 Bronze Layer → Airflow Transformation → S3 Silver Layer
+2. S3 Bronze Layer → Spark Transformation → S3 Silver Layer
 3. S3 Silver Layer → Further Processing → S3 Gold Layer
 ```
 
@@ -247,26 +256,28 @@ The platform provides:
 #### Airflow Integration:
 
 1. **Automatic Source Detection**: Uses registered Airbyte S3 sinks as transformation sources
+
+#### Spark Integration:
+
+1. **Automatic Source Detection**: Uses registered Airbyte S3 sinks as transformation sources
 2. **Medallion Architecture**: Automatically creates 'silver' layer destinations
-3. Converts SQL queries to Airflow DAG configurations
-4. Triggers Airflow DAGs using Bearer token authentication
-5. Tracks job status through Airflow REST API
-6. Returns job status and results
+3. Converts SQL queries to Kubernetes SparkApplications
+4. Executes Spark jobs on Kubernetes using SparkOperator
+5. Returns job status and execution details
 
 #### Typical Workflow:
 
 1. **Bronze Layer**: Register S3 sink via `/sink` endpoint → Ingest raw data via Airbyte
-2. **Silver Layer**: Submit transformation job via `/transformation` → Process data with Spark/Airflow
+2. **Silver Layer**: Submit transformation job via `/transform` → Process data with Spark
 3. **Gold Layer**: Run additional transformations for analytics-ready data
-4. Returns job status and results
 
 ## 📁 Project Structure
 
 ```
 asgard-dev/
 ├── app/
-│   ├── airflow/          # Airflow integration (transformations)
 │   ├── airbyte/          # Airbyte integration (data ingestion)
+│   ├── data_transformation/ # Spark transformation (Kubernetes)
 │   ├── config.py         # Configuration
 │   └── main.py           # FastAPI app
 ├── .env                  # Environment variables
@@ -276,7 +287,6 @@ asgard-dev/
 
 ## 🔒 Security
 
-- Uses Bearer token authentication for Airflow API
 - Basic SQL injection protection
 - Environment-based configuration
 - No sensitive data in code

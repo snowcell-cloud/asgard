@@ -13,11 +13,6 @@ class Settings(BaseSettings):
     airbyte_base_url: str = None
     airbyte_workspace_id: Optional[str] = None
     
-    # Airflow configuration
-    airflow_base_url: str = "http://localhost:8080"
-    airflow_api_base_url: str = "http://localhost:8080/api/v2"
-    airflow_bearer_token: Optional[str] = None
-    
     # AWS/S3 configuration
     aws_access_key_id: Optional[str] = None
     aws_secret_access_key: Optional[str] = None

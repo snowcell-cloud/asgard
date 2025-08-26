@@ -1,20 +1,19 @@
-"""Application entry point."""
 
 from fastapi import FastAPI
 
 from app.airbyte.router import router as airbyte_router
-from app.airflow.router import router as transformation_router
+from app.data_transformation.router import router as transform_router
 
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Asgard Data Platform API",
-        description="FastAPI wrapper for Airbyte and data transformation operations",
+        description="FastAPI wrapper for Airbyte data ingestion and Spark transformations",
         version="1.0.0"
     )
     
     # Include routers
     app.include_router(airbyte_router)
-    app.include_router(transformation_router)
+    app.include_router(transform_router)
     
     @app.get("/health")
     async def health():
