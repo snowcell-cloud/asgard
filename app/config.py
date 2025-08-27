@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     
     # Environment-aware configuration
     environment: str = "development"  # development, production, or staging
-    
+
     # Airbyte configuration
     airbyte_base_url: str = None
     airbyte_workspace_id: Optional[str] = None
