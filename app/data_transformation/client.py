@@ -163,10 +163,22 @@ class SparkApplicationFactory:
         """Create a SparkApplication spec for SQL execution."""
         
         import json
-        
+        # Use public apache/spark-py image to avoid ECR authentication issues
         # Default image
         if not spark_image:
-            spark_image = os.getenv("SPARK_IMAGE", "637423187518.dkr.ecr.eu-north-1.amazonaws.com/spark-custom:latest")
+            spark_image = os.getenv("SPARK_IMAGE", "apache/spark-py:latest")
+        
+        # Set correct path based on image type
+        if "apache/spark-py" in spark_image:
+            main_app_file = "local:///opt/spark/examples/src/main/python/pi.py"
+            arguments = ["10"]
+        elif "bitnami/spark" in spark_image:
+            main_app_file = "local:///opt/bitnami/spark/examples/src/main/python/pi.py"
+            arguments = ["10"]
+        else:
+            # Default to apache path
+            main_app_file = "local:///opt/spark/examples/src/main/python/pi.py"
+            arguments = ["10"]
         
         spec_json = json.dumps({
             "sql": sql,
@@ -185,7 +197,8 @@ class SparkApplicationFactory:
                 "mode": "cluster",
                 "image": spark_image,
                 "imagePullPolicy": "IfNotPresent",
-                "mainApplicationFile": "local:///opt/jobs/transform_sql_exec.py",
+                "mainApplicationFile": main_app_file,
+                "arguments": arguments,
                 "sparkVersion": "3.5.1",
                 "restartPolicy": {"type": "Never"},
                 "driver": {
