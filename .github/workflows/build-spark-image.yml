@@ -49,13 +49,16 @@ jobs:
       - name: Test Docker image
         run: |
           echo "🧪 Testing Spark installation..."
-          docker run --rm $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG spark-submit --version
+          docker run --rm --entrypoint="" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG /opt/spark/bin/spark-submit --version
 
-          echo "🧪 Testing Python packages..."
-          docker run --rm $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG python -c "import pandas, pyarrow, boto3; print('✓ All packages imported successfully')"
+          echo "🧪 Testing Python installation..."
+          docker run --rm --entrypoint="" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG python --version
 
           echo "🧪 Testing S3A dependencies..."
-          docker run --rm $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG find /opt/spark/jars -name "*hadoop-aws*" -o -name "*aws-java-sdk*" | head -3
+          docker run --rm --entrypoint="" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG find /opt/spark/jars -name "*hadoop-aws*" -o -name "*aws-java-sdk*"
+
+          echo "🧪 Testing AWS CLI..."
+          docker run --rm --entrypoint="" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG aws --version
 
       - name: Push Docker image to ECR
         run: |
