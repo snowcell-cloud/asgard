@@ -52,13 +52,16 @@ jobs:
           docker run --rm --entrypoint="" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG /opt/spark/bin/spark-submit --version
 
           echo "🧪 Testing Python installation..."
-          docker run --rm --entrypoint="" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG python --version
+          docker run --rm --entrypoint="" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG python3 --version
 
           echo "🧪 Testing S3A dependencies..."
           docker run --rm --entrypoint="" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG find /opt/spark/jars -name "*hadoop-aws*" -o -name "*aws-java-sdk*"
 
           echo "🧪 Testing AWS CLI..."
           docker run --rm --entrypoint="" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG aws --version
+
+          echo "🧪 Testing PySpark..."
+          docker run --rm --entrypoint="" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG python3 -c "from pyspark import SparkContext; print('✅ PySpark import successful')"
 
       - name: Push Docker image to ECR
         run: |
