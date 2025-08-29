@@ -32,12 +32,13 @@ RUN curl -L https://repo1.maven.org/maven2/org/apache/httpcomponents/httpcore/4.
 # Copy S3 JARs to main jars directory
 RUN cp /opt/spark/jars/s3/*.jar /opt/spark/jars/
 
-# Create spark-defaults.conf with S3A configuration
-RUN echo "spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem" >> /opt/spark/conf/spark-defaults.conf && \
-    echo "spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider" >> /opt/spark/conf/spark-defaults.conf && \
-    echo "spark.hadoop.fs.s3a.fast.upload=true" >> /opt/spark/conf/spark-defaults.conf && \
-    echo "spark.sql.adaptive.enabled=true" >> /opt/spark/conf/spark-defaults.conf && \
-    echo "spark.sql.adaptive.coalescePartitions.enabled=true" >> /opt/spark/conf/spark-defaults.conf
+# Create conf directory and spark-defaults.conf with S3A configuration
+RUN mkdir -p /opt/spark/conf && \
+    printf "spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem\n" > /opt/spark/conf/spark-defaults.conf && \
+    printf "spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider\n" >> /opt/spark/conf/spark-defaults.conf && \
+    printf "spark.hadoop.fs.s3a.fast.upload=true\n" >> /opt/spark/conf/spark-defaults.conf && \
+    printf "spark.sql.adaptive.enabled=true\n" >> /opt/spark/conf/spark-defaults.conf && \
+    printf "spark.sql.adaptive.coalescePartitions.enabled=true\n" >> /opt/spark/conf/spark-defaults.conf
 
 # Install Python packages for data processing
 RUN pip install --no-cache-dir \
