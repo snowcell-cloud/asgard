@@ -8,8 +8,17 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Create python symlink for compatibility
+# Create python symlink for compatibility and set PYTHONPATH for PySpark
 RUN ln -sf /usr/bin/python3 /usr/bin/python
+
+# Set up PySpark environment
+RUN PY4J_JAR=$(find /opt/spark/python/lib -name "py4j-*.zip" | head -1) && \
+    echo "PYTHONPATH=/opt/spark/python:$PY4J_JAR:\$PYTHONPATH" >> /etc/environment
+
+# Set environment variables for PySpark
+ENV PYTHONPATH=/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip:$PYTHONPATH
+ENV PYSPARK_PYTHON=python3
+ENV PYSPARK_DRIVER_PYTHON=python3
 
 # Install AWS CLI
 RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \

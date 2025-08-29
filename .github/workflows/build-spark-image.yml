@@ -61,7 +61,12 @@ jobs:
           docker run --rm --entrypoint="" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG aws --version
 
           echo "🧪 Testing PySpark..."
-          docker run --rm --entrypoint="" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG python3 -c "from pyspark import SparkContext; print('✅ PySpark import successful')"
+          docker run --rm --entrypoint="" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG bash -c "
+          PY4J_JAR=\$(find /opt/spark/python/lib -name 'py4j-*.zip' | head -1)
+          export PYTHONPATH=/opt/spark/python:\$PY4J_JAR:\$PYTHONPATH
+          export PYSPARK_PYTHON=python3
+          python3 -c 'from pyspark import SparkContext; print(\"✅ PySpark import successful\")'
+          "
 
       - name: Push Docker image to ECR
         run: |
