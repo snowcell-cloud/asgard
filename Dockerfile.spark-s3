@@ -13,14 +13,14 @@ ENV HADOOP_AWS_VERSION=3.3.4
 RUN mkdir -p /opt/spark/jars/s3
 
 # Download required JARs for S3A support
-RUN curl -L https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/${HADOOP_AWS_VERSION}/hadoop-aws-${HADOOP_AWS_VERSION}.jar \
+RUN curl -L https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/$\{HADOOP_AWS_VERSION\}/hadoop-aws-$\{HADOOP_AWS_VERSION\}.jar \
     -o /opt/spark/jars/s3/hadoop-aws-${HADOOP_AWS_VERSION}.jar
 
-RUN curl -L https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/${AWS_SDK_VERSION}/aws-java-sdk-bundle-${AWS_SDK_VERSION}.jar \
+RUN curl -L https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/$\{AWS_SDK_VERSION\}/aws-java-sdk-bundle-$\{AWS_SDK_VERSION\}.jar \
     -o /opt/spark/jars/s3/aws-java-sdk-bundle-${AWS_SDK_VERSION}.jar
 
 # Download additional dependencies for S3A
-RUN curl -L https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-common/${HADOOP_VERSION}/hadoop-common-${HADOOP_VERSION}.jar \
+RUN curl -L https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-common/$\{HADOOP_VERSION\}/hadoop-common-$\{HADOOP_VERSION\}.jar \
     -o /opt/spark/jars/s3/hadoop-common-${HADOOP_VERSION}.jar
 
 RUN curl -L https://repo1.maven.org/maven2/org/apache/httpcomponents/httpclient/4.5.13/httpclient-4.5.13.jar \
@@ -47,18 +47,10 @@ RUN pip install --no-cache-dir \
     numpy \
     boto3
 
-# Create a startup script to handle environment variables
-RUN echo '#!/bin/bash' > /opt/spark/bin/start-spark-with-s3.sh && \
-    echo 'export SPARK_CLASSPATH="$SPARK_CLASSPATH:/opt/spark/jars/s3/*"' >> /opt/spark/bin/start-spark-with-s3.sh && \
-    echo 'exec "$@"' >> /opt/spark/bin/start-spark-with-s3.sh && \
-    chmod +x /opt/spark/bin/start-spark-with-s3.sh
-
 # Set proper permissions
-RUN chown -R spark:spark /opt/spark/jars/s3 /opt/spark/conf/spark-defaults.conf
+RUN chown -R spark:spark /opt/spark/jars /opt/spark/conf
 
 # Switch back to spark user
 USER spark
 
-# Set the entrypoint to use our startup script
-ENTRYPOINT ["/opt/spark/bin/start-spark-with-s3.sh"]
-CMD ["/opt/spark/bin/spark-submit"]
+# Use default Apache Spark entrypoint and CMD
