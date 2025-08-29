@@ -5,7 +5,7 @@ on:
     branches:
       - dev
     paths:
-      - "Dockerfile.spark-s3"
+      - "spark.Dockerfile"
       - ".github/workflows/build-spark-image.yml"
   workflow_dispatch:
 
