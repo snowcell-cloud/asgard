@@ -1,0 +1,63 @@
+# Use the official Apache Spark image as base
+FROM apache/spark:3.4.0
+
+# Switch to root to install packages
+USER root
+
+# Set environment variables
+ENV HADOOP_VERSION=3.3.4
+ENV AWS_SDK_VERSION=1.12.367
+ENV HADOOP_AWS_VERSION=3.3.4
+
+# Create directories for additional JARs
+RUN mkdir -p /opt/spark/jars/s3
+
+# Download required JARs for S3A support
+RUN curl -L https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/${HADOOP_AWS_VERSION}/hadoop-aws-${HADOOP_AWS_VERSION}.jar \
+    -o /opt/spark/jars/s3/hadoop-aws-${HADOOP_AWS_VERSION}.jar
+
+RUN curl -L https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/${AWS_SDK_VERSION}/aws-java-sdk-bundle-${AWS_SDK_VERSION}.jar \
+    -o /opt/spark/jars/s3/aws-java-sdk-bundle-${AWS_SDK_VERSION}.jar
+
+# Download additional dependencies for S3A
+RUN curl -L https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-common/${HADOOP_VERSION}/hadoop-common-${HADOOP_VERSION}.jar \
+    -o /opt/spark/jars/s3/hadoop-common-${HADOOP_VERSION}.jar
+
+RUN curl -L https://repo1.maven.org/maven2/org/apache/httpcomponents/httpclient/4.5.13/httpclient-4.5.13.jar \
+    -o /opt/spark/jars/s3/httpclient-4.5.13.jar
+
+RUN curl -L https://repo1.maven.org/maven2/org/apache/httpcomponents/httpcore/4.4.15/httpcore-4.4.15.jar \
+    -o /opt/spark/jars/s3/httpcore-4.4.15.jar
+
+# Copy S3 JARs to main jars directory
+RUN cp /opt/spark/jars/s3/*.jar /opt/spark/jars/
+
+# Create spark-defaults.conf with S3A configuration
+RUN echo "spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem" >> /opt/spark/conf/spark-defaults.conf && \
+    echo "spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider" >> /opt/spark/conf/spark-defaults.conf && \
+    echo "spark.hadoop.fs.s3a.fast.upload=true" >> /opt/spark/conf/spark-defaults.conf && \
+    echo "spark.sql.adaptive.enabled=true" >> /opt/spark/conf/spark-defaults.conf && \
+    echo "spark.sql.adaptive.coalescePartitions.enabled=true" >> /opt/spark/conf/spark-defaults.conf
+
+# Install Python packages for data processing
+RUN pip install --no-cache-dir \
+    pandas \
+    pyarrow \
+    numpy \
+    boto3
+
+# Create a startup script to handle environment variables
+RUN echo '#!/bin/bash' > /opt/spark/bin/start-spark-with-s3.sh && \
+    echo 'export SPARK_CLASSPATH="$SPARK_CLASSPATH:/opt/spark/jars/s3/*"' >> /opt/spark/bin/start-spark-with-s3.sh && \
+    echo 'exec "$@"' >> /opt/spark/bin/start-spark-with-s3.sh && \
+    chmod +x /opt/spark/bin/start-spark-with-s3.sh
+
+# Set proper permissions
+RUN chown -R spark:spark /opt/spark/jars/s3 /opt/spark/conf/spark-defaults.conf
+
+# Switch back to spark user
+USER spark
+
+# Set the entrypoint to use our startup script
+ENTRYPOINT ["/opt/spark/bin/start-spark-with-s3.sh"]
+CMD ["/opt/spark/bin/spark-submit"]

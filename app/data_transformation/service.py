@@ -82,16 +82,17 @@ class TransformationService:
                 detail="S3 destination configuration is missing bucket name"
             )
         
+        # Generate unique run ID first
+        run_id = uuid.uuid4().hex[:8]
+        name = f"sql-exec-{run_id}"
+        
         # Construct source and destination paths
-        source_s3_path = f"s3a://{source_bucket}/{source_path}"
-        destination_s3_path = f"s3a://{source_bucket}/silver/"
+        source_s3_path = f"s3a://{source_bucket}/bronze/"
+        destination_s3_path = f"s3a://{source_bucket}/silver/{run_id}/"
         
         # Sources list for Spark (bronze layer data)
         sources = [source_s3_path]
         destination = destination_s3_path
-        
-        run_id = uuid.uuid4().hex[:8]
-        name = f"sql-exec-{run_id}"
         
         # Create SparkApplication spec
         spark_spec = SparkApplicationFactory.create_sql_execution_spec(

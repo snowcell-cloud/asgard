@@ -163,23 +163,101 @@ class SparkApplicationFactory:
         """Create a SparkApplication spec for SQL execution."""
         
         import json
-        # Use public apache/spark-py image to avoid ECR authentication issues
-        # Default image
+        # Use custom spark image with S3A support
         if not spark_image:
-            spark_image = os.getenv("SPARK_IMAGE", "apache/spark-py:latest")
+            spark_image = os.getenv("SPARK_IMAGE", "637423187518.dkr.ecr.eu-north-1.amazonaws.com/spark-custom:latest")
         
-        # Set correct path based on image type
-        if "apache/spark-py" in spark_image:
-            main_app_file = "local:///opt/spark/examples/src/main/python/pi.py"
-            arguments = ["10"]
-        elif "bitnami/spark" in spark_image:
-            main_app_file = "local:///opt/bitnami/spark/examples/src/main/python/pi.py"
-            arguments = ["10"]
-        else:
-            # Default to apache path
-            main_app_file = "local:///opt/spark/examples/src/main/python/pi.py"
-            arguments = ["10"]
+        # Create a simple Python script content that reads from S3 and runs SQL
+        python_script_content = f'''
+import os
+import sys
+from pyspark.sql import SparkSession
+
+# Initialize Spark session with S3 configuration
+spark = SparkSession.builder \\
+    .appName("SQL Data Transformation - {name}") \\
+    .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider") \\
+    .config("spark.hadoop.fs.s3a.access.key", os.getenv("AWS_ACCESS_KEY_ID")) \\
+    .config("spark.hadoop.fs.s3a.secret.key", os.getenv("AWS_SECRET_ACCESS_KEY")) \\
+    .config("spark.hadoop.fs.s3a.endpoint", "s3.amazonaws.com") \\
+    .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \\
+    .config("spark.hadoop.fs.s3a.fast.upload", "true") \\
+    .config("spark.sql.adaptive.enabled", "true") \\
+    .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \\
+    .getOrCreate()
+
+print("Spark session initialized successfully")
+
+try:
+    # Source paths from environment
+    source_paths = {sources}
+    destination_path = "{destination}"
+    sql_query = "{sql}" if "{sql}".strip() else "SELECT *, '{name}' as processing_run_id FROM source_data"
+    
+    print(f"Reading data from sources: {{source_paths}}")
+    
+    # Read data from all source paths and union them
+    dfs = []
+    for source_path in source_paths:
+        print(f"Reading from: {{source_path}}")
+        try:
+            df = spark.read.parquet(source_path)
+            print(f"Successfully read {{df.count()}} rows from {{source_path}}")
+            dfs.append(df)
+        except Exception as e:
+            print(f"Warning: Could not read from {{source_path}}: {{e}}")
+    
+    if not dfs:
+        print("No data found in any source paths")
+        sys.exit(1)
+    
+    # Union all dataframes
+    if len(dfs) == 1:
+        combined_df = dfs[0]
+    else:
+        combined_df = dfs[0]
+        for df in dfs[1:]:
+            combined_df = combined_df.union(df)
+    
+    print(f"Combined dataset has {{combined_df.count()}} total rows")
+    
+    # Show schema and sample data
+    print("Schema:")
+    combined_df.printSchema()
+    print("Sample data (first 5 rows):")
+    combined_df.show(5, truncate=False)
+    
+    # Create temporary view for SQL
+    combined_df.createOrReplaceTempView("source_data")
+    
+    # Execute SQL transformation
+    print(f"Executing SQL: {{sql_query}}")
+    result_df = spark.sql(sql_query)
+    
+    print("Transformation result sample:")
+    result_df.show(5, truncate=False)
+    print(f"Result has {{result_df.count()}} rows")
+    
+    # Write results to destination
+    print(f"Writing results to: {{destination_path}}")
+    result_df.coalesce(1) \\
+        .write \\
+        .mode("{write_mode}") \\
+        .parquet(destination_path)
+    
+    print("✅ Transformation completed successfully!")
+    
+except Exception as e:
+    print(f"❌ Error during transformation: {{str(e)}}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+    
+finally:
+    spark.stop()
+'''
         
+        # Create spec for the transformation
         spec_json = json.dumps({
             "sql": sql,
             "sources": sources,
@@ -197,31 +275,59 @@ class SparkApplicationFactory:
                 "mode": "cluster",
                 "image": spark_image,
                 "imagePullPolicy": "IfNotPresent",
-                "mainApplicationFile": main_app_file,
-                "arguments": arguments,
-                "sparkVersion": "3.5.1",
+                "mainApplicationFile": "local:///opt/bitnami/spark/work-dir/sql_transform.py",
+                "sparkVersion": "3.4.0",
                 "restartPolicy": {"type": "Never"},
+                "volumes": [
+                    {
+                        "name": "sql-script",
+                        "configMap": {
+                            "name": "sql-transform-script"
+                        }
+                    }
+                ],
                 "driver": {
                     "cores": driver_cores,
                     "memory": driver_memory,
                     "serviceAccount": service_account,
                     "envFrom": [{"secretRef": {"name": s3_secret_name}}],
+                    "env": [
+                        {"name": "TRANSFORM_SPEC", "value": spec_json},
+                        {"name": "SQL_QUERY", "value": sql},
+                        {"name": "SOURCE_PATHS", "value": json.dumps(sources)},
+                        {"name": "DESTINATION_PATH", "value": destination},
+                        {"name": "WRITE_MODE", "value": write_mode}
+                    ],
+                    "volumeMounts": [
+                        {
+                            "name": "sql-script",
+                            "mountPath": "/opt/bitnami/spark/work-dir/sql_transform.py",
+                            "subPath": "sql_transform.py"
+                        }
+                    ]
                 },
                 "executor": {
                     "cores": executor_cores,
                     "instances": executor_instances,
                     "memory": executor_memory,
                     "envFrom": [{"secretRef": {"name": s3_secret_name}}],
+                    "env": [
+                        {"name": "TRANSFORM_SPEC", "value": spec_json},
+                        {"name": "SQL_QUERY", "value": sql},
+                        {"name": "SOURCE_PATHS", "value": json.dumps(sources)},
+                        {"name": "DESTINATION_PATH", "value": destination},
+                        {"name": "WRITE_MODE", "value": write_mode}
+                    ]
                 },
                 "sparkConf": {
                     "spark.sql.adaptive.enabled": "true",
-                    "spark.hadoop.fs.s3a.aws.region": "$(AWS_REGION)",
                     "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
                     "spark.hadoop.fs.s3a.access.key": "$(AWS_ACCESS_KEY_ID)",
                     "spark.hadoop.fs.s3a.secret.key": "$(AWS_SECRET_ACCESS_KEY)",
-                    "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem"
-                },
-                "driverEnv": {"TRANSFORM_SPEC_JSON": spec_json}
+                    "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
+                    "spark.hadoop.fs.s3a.fast.upload": "true",
+                    "spark.hadoop.fs.s3a.aws.region": "$(AWS_REGION)"
+                }
             }
         }
 
