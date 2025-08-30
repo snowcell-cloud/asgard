@@ -5,6 +5,9 @@ Service layer for data transformation operations.
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 import uuid
+import os
+
+from fastapi import HTTPException
 
 from app.data_transformation.client import SparkApplicationClient, SparkApplicationFactory
 from app.data_transformation.schemas import TransformReq
@@ -65,16 +68,26 @@ class TransformationService:
     
     async def submit_transformation(self, req: TransformReq) -> Dict[str, Any]:
         """Submit a new transformation job."""
-        # Fetch S3 destinations from Airbyte
-        s3_destinations = await self._get_s3_destinations()
         
-        # Use the first S3 destination as source
-        source_dest = s3_destinations[0]
+        # Generate unique run ID first
+        run_id = uuid.uuid4().hex[:8]
+        name = f"sql-exec-{run_id}"
         
-        # Extract S3 configuration from the destination
-        dest_config = source_dest.get("configuration", {})
-        source_bucket = dest_config.get("s3_bucket_name")
-        source_path = dest_config.get("s3_bucket_path", "")
+        # Try to get S3 configuration from Airbyte, fallback to environment variables
+        try:
+            s3_destinations = await self._get_s3_destinations()
+            source_dest = s3_destinations[0]
+            dest_config = source_dest.get("configuration", {})
+            source_bucket = dest_config.get("s3_bucket_name")
+        except Exception as e:
+            print(f"Warning: Could not get S3 config from Airbyte: {e}")
+            # Fallback to environment variable or default
+            source_bucket = os.getenv("S3_BUCKET_NAME", "your-default-bucket")
+            if source_bucket == "your-default-bucket":
+                raise HTTPException(
+                    status_code=500,
+                    detail="S3 bucket configuration missing. Set S3_BUCKET_NAME environment variable or configure Airbyte S3 destination."
+                )
         
         if not source_bucket:
             raise HTTPException(
@@ -82,17 +95,16 @@ class TransformationService:
                 detail="S3 destination configuration is missing bucket name"
             )
         
-        # Generate unique run ID first
-        run_id = uuid.uuid4().hex[:8]
-        name = f"sql-exec-{run_id}"
-        
         # Construct source and destination paths
+        # Read from bronze layer, write to silver layer with run_id
         source_s3_path = f"s3a://{source_bucket}/bronze/"
         destination_s3_path = f"s3a://{source_bucket}/silver/{run_id}/"
         
         # Sources list for Spark (bronze layer data)
         sources = [source_s3_path]
         destination = destination_s3_path
+        
+        print(f"Creating Spark job - Source: {source_s3_path}, Destination: {destination_s3_path}")
         
         # Create SparkApplication spec
         spark_spec = SparkApplicationFactory.create_sql_execution_spec(
@@ -109,21 +121,28 @@ class TransformationService:
             executor_memory=req.executor_memory
         )
         
-        # Create the SparkApplication
-        self.spark_client.create_spark_application(spark_spec)
-        
-        # Log the successful creation
-        print(f"SparkApplication {name} created successfully in namespace {self.spark_client.namespace}")
-        
-        return {
-            "run_id": run_id, 
-            "spark_application": name, 
-            "status": "submitted",
-            "source": source_s3_path,
-            "destination": destination_s3_path,
-            "message": f"Transformation submitted. Source: {source_s3_path} -> Destination: {destination_s3_path}",
-            "namespace": self.spark_client.namespace
-        }
+        try:
+            # Create the SparkApplication
+            response = self.spark_client.create_spark_application(spark_spec)
+            print(f"SparkApplication {name} created successfully in namespace {self.spark_client.namespace}")
+            
+            return {
+                "run_id": run_id, 
+                "spark_application": name, 
+                "status": "submitted",
+                "source": source_s3_path,
+                "destination": destination_s3_path,
+                "sql": req.sql,
+                "message": f"Transformation submitted. Source: {source_s3_path} -> Destination: {destination_s3_path}",
+                "namespace": self.spark_client.namespace,
+                "spark_response": response.get("metadata", {}).get("name", name)
+            }
+        except Exception as e:
+            print(f"Error creating SparkApplication: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to create Spark job: {str(e)}"
+            )
     
     def get_job_status(self, run_id: str) -> Dict[str, Any]:
         """Get the status of a transformation job."""
