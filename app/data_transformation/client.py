@@ -156,7 +156,7 @@ class SparkApplicationFactory:
         executor_cores: int = 1,
         executor_instances: int = 1,
         executor_memory: str = "512m",
-        spark_image: str = "637423187518.dkr.ecr.eu-north-1.amazonaws.com/spark-custom:latest",
+        spark_image: str = "637423187518.dkr.ecr.eu-north-1.amazonaws.com/spark-custom:20be6eb59c92071c96dff8c30252411b0fcad0fb",
         service_account: str = "spark-sa",
         s3_secret_name: str = "s3-credentials"
     ) -> Dict[str, Any]:
@@ -165,7 +165,7 @@ class SparkApplicationFactory:
         import json
         # Use custom Spark image with S3A support
         if not spark_image:
-            spark_image = os.getenv("SPARK_IMAGE", "apache/spark-py:v3.4.0")
+            spark_image = os.getenv("SPARK_IMAGE")
         
         return {
             "apiVersion": "sparkoperator.k8s.io/v1beta2",
