@@ -201,28 +201,78 @@ class SparkApplicationFactory:
                     "cores": driver_cores,
                     "memory": driver_memory,
                     "serviceAccount": service_account,
+                    "envFrom": [
+                        {
+                            "secretRef": {
+                                "name": s3_secret_name
+                            }
+                        }
+                    ],
                     "env": [
                         {
                             "name": "SQL_QUERY",
                             "value": sql
+                        },
+                        {
+                            "name": "SOURCE_PATHS", 
+                            "value": json.dumps(sources)
+                        },
+                        {
+                            "name": "DESTINATION_PATH",
+                            "value": destination
+                        },
+                        {
+                            "name": "WRITE_MODE",
+                            "value": write_mode
                         }
-                    ]
+                    ],
+                    "volumeMounts": []
                 },
                 "executor": {
                     "cores": executor_cores,
                     "instances": executor_instances,
                     "memory": executor_memory,
+                    "envFrom": [
+                        {
+                            "secretRef": {
+                                "name": s3_secret_name
+                            }
+                        }
+                    ],
                     "env": [
                         {
                             "name": "SQL_QUERY",
                             "value": sql
+                        },
+                        {
+                            "name": "SOURCE_PATHS",
+                            "value": json.dumps(sources) 
+                        },
+                        {
+                            "name": "DESTINATION_PATH",
+                            "value": destination
+                        },
+                        {
+                            "name": "WRITE_MODE", 
+                            "value": write_mode
                         }
                     ]
                 },
                 "sparkConf": {
                     "spark.sql.adaptive.enabled": "true",
-                    "spark.sql.adaptive.coalescePartitions.enabled": "true"
-                }
+                    "spark.sql.adaptive.coalescePartitions.enabled": "true",
+                    "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
+                    "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
+                    "spark.hadoop.fs.s3a.fast.upload": "true",
+                    "spark.hadoop.fs.s3a.multipart.size": "67108864",
+                    "spark.hadoop.fs.s3a.connection.ssl.enabled": "true",
+                    "spark.hadoop.fs.s3a.path.style.access": "false",
+                    "spark.jars.packages": "org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.367",
+                    "spark.jars.repositories": "https://repo1.maven.org/maven2/",
+                    "spark.driver.extraJavaOptions": "-Dcom.amazonaws.services.s3.enableV4=true",
+                    "spark.executor.extraJavaOptions": "-Dcom.amazonaws.services.s3.enableV4=true"
+                },
+                "volumes": []
             }
         }
 
