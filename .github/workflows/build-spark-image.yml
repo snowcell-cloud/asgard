@@ -13,7 +13,7 @@ env:
   AWS_REGION: eu-north-1
   ECR_REGISTRY: 637423187518.dkr.ecr.eu-north-1.amazonaws.com
   ECR_REPOSITORY: spark-custom
-  IMAGE_TAG: latest
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
   build-and-push:

@@ -96,11 +96,22 @@ class TransformationService:
             )
         
         # Construct source and destination paths
-        # Read from bronze layer, write to silver layer with run_id
-        source_s3_path = f"s3a://{source_bucket}/bronze/"
+        # Use custom source path if provided, otherwise use bronze layer
+        if req.source_path:
+            # Use the specific S3 path provided by the user
+            if req.source_path.startswith("s3://"):
+                source_s3_path = req.source_path.replace("s3://", "s3a://", 1)
+            elif req.source_path.startswith("s3a://"):
+                source_s3_path = req.source_path
+            else:
+                source_s3_path = f"s3a://{req.source_path}"
+        else:
+            # Default: read from bronze layer
+            source_s3_path = f"s3a://{source_bucket}/bronze/"
+            
         destination_s3_path = f"s3a://{source_bucket}/silver/{run_id}/"
         
-        # Sources list for Spark (bronze layer data)
+        # Sources list for Spark
         sources = [source_s3_path]
         destination = destination_s3_path
         
@@ -118,7 +129,8 @@ class TransformationService:
             driver_memory=req.driver_memory,
             executor_cores=req.executor_cores,
             executor_instances=req.executor_instances,
-            executor_memory=req.executor_memory
+            executor_memory=req.executor_memory,
+            spark_image="637423187518.dkr.ecr.eu-north-1.amazonaws.com/spark-custom:20250830"
         )
         
         try:

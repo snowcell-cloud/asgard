@@ -156,7 +156,7 @@ class SparkApplicationFactory:
         executor_cores: int = 1,
         executor_instances: int = 1,
         executor_memory: str = "512m",
-        spark_image: str = None,
+        spark_image: str = "637423187518.dkr.ecr.eu-north-1.amazonaws.com/spark-custom:latest",
         service_account: str = "spark-sa",
         s3_secret_name: str = "s3-credentials"
     ) -> Dict[str, Any]:
@@ -183,8 +183,9 @@ class SparkApplicationFactory:
                 "pythonVersion": "3",
                 "mode": "cluster",
                 "image": spark_image,
-                "imagePullPolicy": "IfNotPresent",
-                "mainApplicationFile": "local:///opt/spark/examples/src/main/python/pi.py",
+                "imagePullPolicy": "Always",
+                "imagePullSecrets": ["ecr-secret"],
+                "mainApplicationFile": "local:///opt/spark/sql_transform.py",
                 "sparkVersion": "3.4.0",
                 "restartPolicy": {
                     "type": "Never"
@@ -262,6 +263,21 @@ class SparkApplicationFactory:
                     "spark.sql.adaptive.enabled": "true",
                     "spark.sql.adaptive.coalescePartitions.enabled": "true",
                     "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
+                    "spark.hadoop.fs.s3a.access.key": "${AWS_ACCESS_KEY_ID}",
+                    "spark.hadoop.fs.s3a.secret.key": "${AWS_SECRET_ACCESS_KEY}",
+                    "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
+                    "spark.hadoop.fs.s3a.fast.upload": "true",
+                    "spark.hadoop.fs.s3a.multipart.size": "67108864",
+                    "spark.hadoop.fs.s3a.connection.ssl.enabled": "true",
+                    "spark.hadoop.fs.s3a.path.style.access": "false",
+                    "spark.driver.extraJavaOptions": "-Dcom.amazonaws.services.s3.enableV4=true",
+                    "spark.executor.extraJavaOptions": "-Dcom.amazonaws.services.s3.enableV4=true"
+                } if not "apache/spark" in spark_image else {
+                    "spark.sql.adaptive.enabled": "true",
+                    "spark.sql.adaptive.coalescePartitions.enabled": "true",
+                    "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
+                    "spark.hadoop.fs.s3a.access.key": "${AWS_ACCESS_KEY_ID}",
+                    "spark.hadoop.fs.s3a.secret.key": "${AWS_SECRET_ACCESS_KEY}",
                     "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
                     "spark.hadoop.fs.s3a.fast.upload": "true",
                     "spark.hadoop.fs.s3a.multipart.size": "67108864",
