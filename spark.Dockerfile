@@ -39,6 +39,7 @@ RUN mkdir -p /opt/spark/work-dir && \
 COPY sql_transform_embedded.py /opt/spark/sql_transform.py
 RUN chmod +x /opt/spark/sql_transform.py && chown 185:185 /opt/spark/sql_transform.py
 
+
 # Switch back to spark user
 USER 185
 

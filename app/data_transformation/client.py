@@ -190,14 +190,6 @@ class SparkApplicationFactory:
                 "restartPolicy": {
                     "type": "Never"
                 },
-                "volumes": [
-                    {
-                        "name": "sql-script",
-                        "configMap": {
-                            "name": "simple-transform-script"
-                        }
-                    }
-                ],
                 "driver": {
                     "cores": driver_cores,
                     "memory": driver_memory,

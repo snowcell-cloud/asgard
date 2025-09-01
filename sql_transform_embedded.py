@@ -12,10 +12,25 @@ def main():
     print("🚀 Starting SQL transformation...")
     
     # Get configuration from environment variables
-    sql_query = os.getenv("SQL_QUERY", "SELECT *, CURRENT_TIMESTAMP() as processing_time FROM source_data")
-    source_paths_json = os.getenv("SOURCE_PATHS", '["s3a://airbytedestination1/bronze/*"]')
-    destination_path = os.getenv("DESTINATION_PATH", "s3a://airbytedestination1/silver/default/")
+    sql_query = os.getenv("SQL_QUERY")
+    source_paths_json = os.getenv("SOURCE_PATHS")
+    destination_path = os.getenv("DESTINATION_PATH")
     write_mode = os.getenv("WRITE_MODE", "overwrite")
+    
+    # Validate required environment variables
+    if not sql_query:
+        print("❌ ERROR: SQL_QUERY environment variable is required")
+        sys.exit(1)
+    
+    if not source_paths_json:
+        print("❌ ERROR: SOURCE_PATHS environment variable is required")
+        print("    This should be set by the transformation API")
+        sys.exit(1)
+    
+    if not destination_path:
+        print("❌ ERROR: DESTINATION_PATH environment variable is required") 
+        print("    This should be set by the transformation API")
+        sys.exit(1)
     
     print(f"SQL Query: {sql_query}")
     print(f"Source paths: {source_paths_json}")
