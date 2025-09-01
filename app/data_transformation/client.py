@@ -156,7 +156,7 @@ class SparkApplicationFactory:
         executor_cores: int = 1,
         executor_instances: int = 1,
         executor_memory: str = "512m",
-        spark_image: str = "637423187518.dkr.ecr.eu-north-1.amazonaws.com/spark-custom:a916e4ecab583e1fd4835520e61f2f8597b91bec",
+        spark_image: str = "637423187518.dkr.ecr.eu-north-1.amazonaws.com/spark-custom:latest",
         service_account: str = "spark-sa",
         s3_secret_name: str = "s3-credentials"
     ) -> Dict[str, Any]:
@@ -255,8 +255,9 @@ class SparkApplicationFactory:
                     "spark.sql.adaptive.enabled": "true",
                     "spark.sql.adaptive.coalescePartitions.enabled": "true",
                     "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-                    "spark.hadoop.fs.s3a.access.key": "${AWS_ACCESS_KEY_ID}",
-                    "spark.hadoop.fs.s3a.secret.key": "${AWS_SECRET_ACCESS_KEY}",
+                    "spark.hadoop.fs.s3a.access.key":  os.getenv("AWS_ACCESS_KEY_ID"),
+                    "spark.hadoop.fs.s3a.secret.key":  os.getenv("AWS_SECRET_ACCESS_KEY"),
+                    "spark.hadoop.fs.s3a.endpoint.region":  os.getenv("AWS_REGION"),
                     "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
                     "spark.hadoop.fs.s3a.fast.upload": "true",
                     "spark.hadoop.fs.s3a.multipart.size": "67108864",
@@ -264,26 +265,11 @@ class SparkApplicationFactory:
                     "spark.hadoop.fs.s3a.path.style.access": "false",
                     "spark.driver.extraJavaOptions": "-Dcom.amazonaws.services.s3.enableV4=true",
                     "spark.executor.extraJavaOptions": "-Dcom.amazonaws.services.s3.enableV4=true",
-                    # Pass our parameters via spark configuration
-                    "spark.sql.transform.query": sql.replace('"', '\\"'),
-                    "spark.sql.transform.sources": json.dumps(sources).replace('"', '\\"'),
+                    # Pass our parameters via spark configuration  
+                    "spark.sql.transform.query": sql,
+                    "spark.sql.transform.sources": json.dumps(sources),
                     "spark.sql.transform.destination": destination,
                     "spark.sql.transform.writeMode": write_mode
-                } if not "apache/spark" in spark_image else {
-                    "spark.sql.adaptive.enabled": "true",
-                    "spark.sql.adaptive.coalescePartitions.enabled": "true",
-                    "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-                    "spark.hadoop.fs.s3a.access.key": "${AWS_ACCESS_KEY_ID}",
-                    "spark.hadoop.fs.s3a.secret.key": "${AWS_SECRET_ACCESS_KEY}",
-                    "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
-                    "spark.hadoop.fs.s3a.fast.upload": "true",
-                    "spark.hadoop.fs.s3a.multipart.size": "67108864",
-                    "spark.hadoop.fs.s3a.connection.ssl.enabled": "true",
-                    "spark.hadoop.fs.s3a.path.style.access": "false",
-                    "spark.jars.packages": "org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.367",
-                    "spark.jars.repositories": "https://repo1.maven.org/maven2/",
-                    "spark.driver.extraJavaOptions": "-Dcom.amazonaws.services.s3.enableV4=true",
-                    "spark.executor.extraJavaOptions": "-Dcom.amazonaws.services.s3.enableV4=true"
                 },
                 "volumes": []
             }
