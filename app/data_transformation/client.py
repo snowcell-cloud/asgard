@@ -156,7 +156,7 @@ class SparkApplicationFactory:
         executor_cores: int = 1,
         executor_instances: int = 1,
         executor_memory: str = "512m",
-        spark_image: str = "637423187518.dkr.ecr.eu-north-1.amazonaws.com/spark-custom:20be6eb59c92071c96dff8c30252411b0fcad0fb",
+        spark_image: str = "637423187518.dkr.ecr.eu-north-1.amazonaws.com/spark-custom:a916e4ecab583e1fd4835520e61f2f8597b91bec",
         service_account: str = "spark-sa",
         s3_secret_name: str = "s3-credentials"
     ) -> Dict[str, Any]:
@@ -263,7 +263,12 @@ class SparkApplicationFactory:
                     "spark.hadoop.fs.s3a.connection.ssl.enabled": "true",
                     "spark.hadoop.fs.s3a.path.style.access": "false",
                     "spark.driver.extraJavaOptions": "-Dcom.amazonaws.services.s3.enableV4=true",
-                    "spark.executor.extraJavaOptions": "-Dcom.amazonaws.services.s3.enableV4=true"
+                    "spark.executor.extraJavaOptions": "-Dcom.amazonaws.services.s3.enableV4=true",
+                    # Pass our parameters via spark configuration
+                    "spark.sql.transform.query": sql.replace('"', '\\"'),
+                    "spark.sql.transform.sources": json.dumps(sources).replace('"', '\\"'),
+                    "spark.sql.transform.destination": destination,
+                    "spark.sql.transform.writeMode": write_mode
                 } if not "apache/spark" in spark_image else {
                     "spark.sql.adaptive.enabled": "true",
                     "spark.sql.adaptive.coalescePartitions.enabled": "true",
