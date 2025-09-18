@@ -1,3 +1,16 @@
 .venv/
-.env/
+
+
 __pycache__/
+.vscode/
+test*
+
+*.pyc
+.env
+debug*
+DEBUG*
+api.log
+# update .gitignore
+
+*.env.local
+

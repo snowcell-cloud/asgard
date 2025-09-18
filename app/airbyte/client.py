@@ -193,6 +193,17 @@ class AirbyteClient:
         """Create a connection between an existing source and destination."""
         return await self._post("/connections", payload)
 
+    async def get_connection(self, connection_id: str) -> dict:
+        """Get details of a specific connection."""
+        logger.info(f"Getting connection details for: {connection_id}")
+        try:
+            result = await self._get(f"/connections/{connection_id}")
+            logger.info(f"Connection details retrieved: {connection_id}")
+            return result
+        except Exception as e:
+            logger.error(f"Error getting connection: {e}")
+            raise
+
 @asynccontextmanager
 async def get_airbyte_client() -> AsyncGenerator[AirbyteClient, None]:
     settings = get_settings()

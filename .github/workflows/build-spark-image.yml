@@ -1,0 +1,155 @@
+name: Build and Push Spark S3 Image to ECR
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - "spark.Dockerfile"
+      - ".github/workflows/build-spark-image.yml"
+      - "sql_transform_embedded.py"
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-north-1
+  ECR_REGISTRY: 637423187518.dkr.ecr.eu-north-1.amazonaws.com
+  ECR_REPOSITORY: spark-custom
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-push:
+    name: Build and Push Spark Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -f spark.Dockerfile \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            .
+
+      - name: Test Docker image
+        run: |
+          echo "🧪 Testing Spark installation..."
+          docker run --rm --entrypoint="" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG /opt/spark/bin/spark-submit --version
+
+          echo "🧪 Testing Python installation..."
+          docker run --rm --entrypoint="" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG python3 --version
+
+          echo "🧪 Testing S3A dependencies..."
+          docker run --rm --entrypoint="" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG find /opt/spark/jars -name "*hadoop-aws*" -o -name "*aws-java-sdk*"
+
+          echo "🧪 Testing AWS CLI..."
+          docker run --rm --entrypoint="" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG aws --version
+
+          echo "🧪 Testing PySpark..."
+          docker run --rm --entrypoint="" $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG bash -c "
+          PY4J_JAR=\$(find /opt/spark/python/lib -name 'py4j-*.zip' | head -1)
+          export PYTHONPATH=/opt/spark/python:\$PY4J_JAR:\$PYTHONPATH
+          export PYSPARK_PYTHON=python3
+          python3 -c 'from pyspark import SparkContext; print(\"✅ PySpark import successful\")'
+          "
+
+      - name: Push Docker image to ECR
+        run: |
+          echo "📤 Pushing image to ECR..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Update image tag in deployment files
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+        run: |
+          echo "🔄 Updating image references..."
+
+          # Update client.py if it exists
+          if [ -f "app/data_transformation/client.py" ]; then
+            sed -i "s|image: .*spark.*|image: \"$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\"|g" app/data_transformation/client.py
+            sed -i "s|\"apache/spark-py:latest\"|\"$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\"|g" app/data_transformation/client.py
+            sed -i "s|\"bitnami/spark:3.4.0\"|\"$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\"|g" app/data_transformation/client.py
+            echo "✅ Updated app/data_transformation/client.py"
+          fi
+
+          # Update helm values if they exist
+          if [ -f "helmchart/values.yaml" ]; then
+            yq eval ".spark.image.repository = \"$ECR_REGISTRY/$ECR_REPOSITORY\"" -i helmchart/values.yaml
+            yq eval ".spark.image.tag = \"$IMAGE_TAG\"" -i helmchart/values.yaml
+            echo "✅ Updated helmchart/values.yaml"
+          fi
+
+      - name: Commit updated files
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          if git diff --quiet; then
+            echo "No changes to commit"
+          else
+            git add app/data_transformation/client.py helmchart/values.yaml || true
+            git commit -m "Update Spark image to $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG [skip ci]" || true
+            git push || true
+          fi
+
+      - name: Summary
+        run: |
+          echo "🎉 Build and push completed successfully!"
+          echo ""
+          echo "📋 Image Details:"
+          echo "  Repository: $ECR_REGISTRY/$ECR_REPOSITORY"
+          echo "  Tags: $IMAGE_TAG, latest"
+          echo ""
+          echo "🔧 To use this image in your SparkApplication:"
+          echo "  image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          echo ""
+          echo "🚀 Image is ready for deployment!"
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Scan image for vulnerabilities
+        run: |
+          echo "🔍 Starting ECR image scan..."
+          aws ecr start-image-scan \
+            --repository-name $ECR_REPOSITORY \
+            --image-id imageTag=$IMAGE_TAG \
+            --region $AWS_REGION
+
+          echo "⏳ Waiting for scan to complete..."
+          sleep 30
+
+          echo "📊 Scan results:"
+          aws ecr describe-image-scan-findings \
+            --repository-name $ECR_REPOSITORY \
+            --image-id imageTag=$IMAGE_TAG \
+            --region $AWS_REGION \
+            --query 'imageScanFindings.findingCounts' || true

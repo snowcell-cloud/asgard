@@ -21,6 +21,8 @@ from app.airbyte.schemas import (
     DataSourceListResponse,
     IngestionPayload,
     IngestionResponse,
+    IngestionStatusResponse,
+    ScheduleConfig,
     DataDestinationType,
     DataSourceType,
     get_source_definition_id,
@@ -33,7 +35,7 @@ from app.airbyte.schemas import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(tags=["Data Ingestion"])
 
 async def _resolve_workspace_id(client: AirbyteClient, workspace_name: str | None = None) -> str:
     """Resolve workspace ID from name or get default workspace."""
@@ -251,6 +253,19 @@ async def create_ingestion(
                 "streams": []
             }
         }
+        
+        # Add schedule configuration if provided
+        if payload.schedule:
+            conn_req["schedule"] = {
+                "scheduleType": payload.schedule.scheduleType,
+            }
+            if payload.schedule.cronExpression:
+                conn_req["schedule"]["cronExpression"] = payload.schedule.cronExpression
+        
+        # Add status if provided
+        if payload.status:
+            conn_req["status"] = payload.status
+            
         logger.info(f"Connection request prepared: {payload.name}")
 
         logger.debug("Step 2: Calling Airbyte create_connection API")
@@ -262,7 +277,8 @@ async def create_ingestion(
             sourceId=payload.sourceId,
             destinationId=payload.destinationId,
             name=payload.name,
-            status="active",
+            status=payload.status or "active",
+            schedule=payload.schedule,
             created=datetime.utcnow(),
         )
         logger.info(f"Successfully created ingestion connection with ID: {result.connectionId}")
@@ -273,4 +289,43 @@ async def create_ingestion(
         raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
         logger.error(f"Unexpected error in create_ingestion: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+
+@router.get("/ingestion/{ingestionId}/status", response_model=IngestionStatusResponse)
+async def get_ingestion_status(
+    ingestionId: str,
+    client: Annotated[AirbyteClient, Depends(get_airbyte_client_dependency)]
+) -> IngestionStatusResponse:
+    """Get the status of an ingestion connection."""
+    logger.info(f"Getting status for ingestion connection: {ingestionId}")
+
+    try:
+        logger.debug("Step 1: Calling Airbyte get_connection API")
+        conn_details = await client.get_connection(ingestionId)
+        logger.info(f"Connection details retrieved for: {ingestionId}")
+
+        # Extract schedule information if present
+        schedule = None
+        if conn_details.get("schedule"):
+            schedule_data = conn_details["schedule"]
+            schedule = ScheduleConfig(
+                scheduleType=schedule_data.get("scheduleType", "manual"),
+                cronExpression=schedule_data.get("cronExpression")
+            )
+
+        result = IngestionStatusResponse(
+            ingestionId=ingestionId,
+            status=conn_details.get("status", "unknown"),
+            lastSync=None,  # This would need to be implemented based on Airbyte's job history API
+            nextSync=None,  # This would need to be calculated based on schedule
+            schedule=schedule
+        )
+        logger.info(f"Successfully retrieved status for connection: {ingestionId}")
+        return result
+        
+    except AirbyteClientError as e:
+        logger.error(f"Airbyte API error: {e.status_code} - {e.message}")
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Unexpected error in get_ingestion_status: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")

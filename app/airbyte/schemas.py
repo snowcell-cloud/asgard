@@ -167,12 +167,20 @@ class DataSinkResponse(DataSinkPayload):
 
     id: str
 
+class ScheduleConfig(BaseModel):
+    """Schedule configuration for connections."""
+    
+    scheduleType: str = Field(..., example="cron", description="Type of schedule (cron, basic, manual)")
+    cronExpression: Optional[str] = Field(None, example="0 0 * * *", description="Cron expression for scheduling")
+
 class IngestionPayload(BaseModel):
     """Payload for creating a connection between an existing source and destination."""
 
+    name: str = Field(..., example="Postgres-to-Bigquery", description="Name for the connection")
     sourceId: str = Field(..., example="95e66a59-8045-4307-9678-63bc3c9b8c93", description="ID of the source")
     destinationId: str = Field(..., example="e478de0d-a3a0-475c-b019-25f7dd29e281", description="ID of the destination")
-    name: str = Field(..., example="Postgres-to-Bigquery", description="Name for the connection")
+    schedule: Optional[ScheduleConfig] = Field(None, description="Optional schedule configuration")
+    status: Optional[str] = Field("active", example="active", description="Connection status (active, inactive)")
 
 class IngestionResponse(BaseModel):
     """Response returned after creating an ingestion connection."""
@@ -182,7 +190,17 @@ class IngestionResponse(BaseModel):
     destinationId: str = Field(..., description="ID of the destination") 
     name: str = Field(..., description="Name of the connection")
     status: str = Field(..., description="Status of the connection")
+    schedule: Optional[ScheduleConfig] = Field(None, description="Schedule configuration if set")
     created: datetime = Field(..., description="Creation timestamp")
+
+class IngestionStatusResponse(BaseModel):
+    """Response returned when checking ingestion connection status."""
+
+    ingestionId: str = Field(..., description="Unique identifier for the connection")
+    status: str = Field(..., description="Current status of the connection")
+    lastSync: Optional[datetime] = Field(None, description="Last synchronization timestamp")
+    nextSync: Optional[datetime] = Field(None, description="Next scheduled synchronization timestamp")
+    schedule: Optional[ScheduleConfig] = Field(None, description="Schedule configuration if set")
 
 class DataSourceListItem(BaseModel):
     """Individual source item in the list response."""
