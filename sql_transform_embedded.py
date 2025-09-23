@@ -16,15 +16,19 @@ from pyspark.sql import SparkSession
 # ICEBERG FEATURE CONFIG (hardcoded here)
 # Edit these values if you need different behaviour.
 # -----------------------------
-ICEBERG_ENABLED = True
-ICEBERG_CATALOG_NAME = "iceberg"                      # Spark catalog name to register for Iceberg
-ICEBERG_WAREHOUSE = "s3://airbytedestination1/iceberg/"         # Iceberg warehouse path (where metadata + table data live)
+# Configuration parameters
+ICEBERG_ENABLED = False  # Disabled - Iceberg libraries not available in current Spark image
+ICEBERG_CATALOG_NAME = "iceberg"  # Spark catalog name to register for Iceberg
+ICEBERG_WAREHOUSE = (
+    "s3://airbytedestination1/iceberg/"  # Iceberg warehouse path (where metadata + table data live)
+)
 # If you want a specific target table, set in format: catalog.namespace.table
 # If None, the script will derive catalog.namespace.table from the DESTINATION_PATH (last two path components)
 ICEBERG_TARGET_TABLE_OVERRIDE = None
 # Options: "create_or_replace" (default), "append", "overwrite"
 ICEBERG_WRITE_MODE = "append"
 # -----------------------------
+
 
 def getenv_conf_or_env(spark, conf_key, env_key, default=None):
     """Try Spark conf first, then environment variable, then default (kept from earlier variant)."""
@@ -36,20 +40,27 @@ def getenv_conf_or_env(spark, conf_key, env_key, default=None):
         v = os.getenv(env_key, None)
     return v if v is not None else default
 
+
 def sanitize_identifier(name: str) -> str:
     if not name:
         return ""
     n = name.lower()
-    n = re.sub(r'[^a-z0-9_]', '_', n)
-    n = re.sub(r'_+', '_', n)
-    n = n.strip('_')
+    n = re.sub(r"[^a-z0-9_]", "_", n)
+    n = re.sub(r"_+", "_", n)
+    n = n.strip("_")
     if not n:
         n = "x"
-    if re.match(r'^\d', n):
+    if re.match(r"^\d", n):
         n = "t" + n
     return n
 
-def derive_table_from_s3_path(path: str, catalog_name: str = "iceberg_catalog", default_namespace: str = "raw", default_table: str = "table"):
+
+def derive_table_from_s3_path(
+    path: str,
+    catalog_name: str = "iceberg",
+    default_namespace: str = "raw",
+    default_table: str = "table",
+):
     """
     Derive catalog.namespace.table from S3 path.
     Example:
@@ -57,9 +68,9 @@ def derive_table_from_s3_path(path: str, catalog_name: str = "iceberg_catalog", 
     """
     if not path:
         return f"{catalog_name}.{default_namespace}.{default_table}"
-    p = re.sub(r'^s3://', '', path)
-    p = p.rstrip('/')
-    parts = p.split('/')
+    p = re.sub(r"^s3://", "", path)
+    p = p.rstrip("/")
+    parts = p.split("/")
     # ignore bucket name
     if len(parts) >= 3:
         namespace = parts[-2]
@@ -74,6 +85,7 @@ def derive_table_from_s3_path(path: str, catalog_name: str = "iceberg_catalog", 
     table = sanitize_identifier(table)
     return f"{catalog_name}.{namespace}.{table}"
 
+
 def ensure_namespace(spark, catalog: str, namespace: str):
     """
     Try to create namespace if it doesn't exist. Ignore failures gracefully.
@@ -83,22 +95,25 @@ def ensure_namespace(spark, catalog: str, namespace: str):
     except Exception as e:
         print(f"Warning: could not CREATE NAMESPACE {catalog}.{namespace}: {e}")
 
+
 def main():
     print("🚀 Starting SQL transformation...")
 
     # Initialize Spark session first to access configuration
     print("🔧 Initializing Spark session...")
-    spark = SparkSession.builder \
-        .appName("SQL Data Transformation") \
-        .getOrCreate()
+    spark = SparkSession.builder.appName("SQL Data Transformation").getOrCreate()
 
     print("✅ Spark session created")
 
     # Get configuration from Spark conf (preferred) or environment variables (fallback)
     sql_query = spark.conf.get("spark.sql.transform.query", None) or os.getenv("SQL_QUERY")
     sources_json = spark.conf.get("spark.sql.transform.sources", None) or os.getenv("SOURCE_PATHS")
-    destination_path = spark.conf.get("spark.sql.transform.destination", None) or os.getenv("DESTINATION_PATH")
-    write_mode = spark.conf.get("spark.sql.transform.writeMode", None) or os.getenv("WRITE_MODE", "overwrite")
+    destination_path = spark.conf.get("spark.sql.transform.destination", None) or os.getenv(
+        "DESTINATION_PATH"
+    )
+    write_mode = spark.conf.get("spark.sql.transform.writeMode", None) or os.getenv(
+        "WRITE_MODE", "overwrite"
+    )
 
     # Validate required parameters
     if not sql_query:
@@ -113,9 +128,11 @@ def main():
 
     if not destination_path:
         print("❌ ERROR: Destination path is required")
-        print("    Set via spark.sql.transform.destination or DESTINATION_PATH environment variable")
+        print(
+            "    Set via spark.sql.transform.destination or DESTINATION_PATH environment variable"
+        )
         sys.exit(1)
-    
+
     print(f"SQL Query: {sql_query}")
     print(f"Source paths: {sources_json}")
     print(f"Destination: {destination_path}")
@@ -135,11 +152,15 @@ def main():
     if ICEBERG_ENABLED:
         # configure iceberg catalog (Hadoop catalog) in the running Spark session
         try:
-            spark.conf.set(f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}", "org.apache.iceberg.spark.SparkCatalog")
+            spark.conf.set(
+                f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}", "org.apache.iceberg.spark.SparkCatalog"
+            )
             spark.conf.set(f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}.type", "hadoop")
             spark.conf.set(f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}.warehouse", ICEBERG_WAREHOUSE)
             # note: if your spark cluster already had differing catalog config, this may override it in this session only
-            print(f"Configured Iceberg catalog '{ICEBERG_CATALOG_NAME}' with warehouse '{ICEBERG_WAREHOUSE}' in Spark session")
+            print(
+                f"Configured Iceberg catalog '{ICEBERG_CATALOG_NAME}' with warehouse '{ICEBERG_WAREHOUSE}' in Spark session"
+            )
         except Exception as e:
             print(f"Warning: failed to set Iceberg catalog config in Spark session: {e}")
 
@@ -179,9 +200,7 @@ def main():
 
         # Write results to destination (original behavior preserved)
         print(f"💾 Writing results to: {destination_path}")
-        result_df.write \
-            .mode(write_mode) \
-            .parquet(destination_path)
+        result_df.write.mode(write_mode).parquet(destination_path)
 
         print("✅ Data transformation completed successfully!")
 
@@ -193,16 +212,20 @@ def main():
         # Iceberg step (minimal, non-invasive)
         # -------------------------
         if ICEBERG_ENABLED:
-            print("🔁 Starting Iceberg write step (reading back transformed Parquet and writing to Iceberg)")
+            print(
+                "🔁 Starting Iceberg write step (reading back transformed Parquet and writing to Iceberg)"
+            )
 
             # Determine target table: override or derive from destination_path
             target_table = ICEBERG_TARGET_TABLE_OVERRIDE
             if not target_table:
-                target_table = derive_table_from_s3_path(destination_path, catalog_name=ICEBERG_CATALOG_NAME)
+                target_table = derive_table_from_s3_path(
+                    destination_path, catalog_name=ICEBERG_CATALOG_NAME
+                )
                 print(f"Derived ICEBERG_TARGET_TABLE = {target_table}")
 
             # Validate target_table format catalog.namespace.table
-            m = re.match(r'^([^\.]+)\.([^\.]+)\.([^\.]+)$', target_table)
+            m = re.match(r"^([^\.]+)\.([^\.]+)\.([^\.]+)$", target_table)
             if not m:
                 print("❌ ERROR: ICEBERG_TARGET_TABLE must be in format catalog.namespace.table")
                 # Fail the Iceberg step to avoid silent inconsistencies
@@ -229,7 +252,9 @@ def main():
                 sys.exit(1)
 
             # Write to Iceberg using DataFrameWriterV2 (writeTo); use fallbacks for varying Iceberg versions
-            print(f"💾 Writing to Iceberg target table {target_table} with mode {ICEBERG_WRITE_MODE}")
+            print(
+                f"💾 Writing to Iceberg target table {target_table} with mode {ICEBERG_WRITE_MODE}"
+            )
             try:
                 if ICEBERG_WRITE_MODE == "append":
                     iceberg_df.writeTo(target_table).append()
@@ -261,6 +286,7 @@ def main():
         sys.exit(1)
     finally:
         spark.stop()
+
 
 if __name__ == "__main__":
     main()
