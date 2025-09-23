@@ -10,7 +10,51 @@ import os
 
 
 class SparkApplicationClient:
-    """Client for managing SparkApplications in Kubernetes."""
+    """Clien                    "env": [
+                        {
+                            "name": "AWS_ACCESS_KEY_ID",
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "name": s3_secret_name,
+                                    "key": "AWS_ACCESS_KEY_ID"
+                                }
+                            }
+                        },
+                        {
+                            "name": "AWS_SECRET_ACCESS_KEY",
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "name": s3_secret_name,
+                                    "key": "AWS_SECRET_ACCESS_KEY"
+                                }
+                            }
+                        },
+                        {
+                            "name": "AWS_REGION",
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "name": s3_secret_name,
+                                    "key": "AWS_REGION"
+                                }
+                            }
+                        },
+                        {
+                            "name": "SQL_QUERY",
+                            "value": sql
+                        },
+                        {
+                            "name": "SOURCE_PATHS",
+                            "value": json.dumps(sources) 
+                        },
+                        {
+                            "name": "DESTINATION_PATH",
+                            "value": destination
+                        },
+                        {
+                            "name": "WRITE_MODE", 
+                            "value": write_mode
+                        }
+                    ]rkApplications in Kubernetes."""
     
     def __init__(self, namespace: str = "asgard"):
         self.namespace = namespace
@@ -203,6 +247,33 @@ class SparkApplicationFactory:
                     ],
                     "env": [
                         {
+                            "name": "AWS_ACCESS_KEY_ID",
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "name": s3_secret_name,
+                                    "key": "AWS_ACCESS_KEY_ID"
+                                }
+                            }
+                        },
+                        {
+                            "name": "AWS_SECRET_ACCESS_KEY",
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "name": s3_secret_name,
+                                    "key": "AWS_SECRET_ACCESS_KEY"
+                                }
+                            }
+                        },
+                        {
+                            "name": "AWS_REGION",
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "name": s3_secret_name,
+                                    "key": "AWS_REGION"
+                                }
+                            }
+                        },
+                        {
                             "name": "SQL_QUERY",
                             "value": sql
                         },
@@ -255,9 +326,9 @@ class SparkApplicationFactory:
                     "spark.sql.adaptive.enabled": "true",
                     "spark.sql.adaptive.coalescePartitions.enabled": "true",
                     "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-                    "spark.hadoop.fs.s3a.access.key":  os.getenv("AWS_ACCESS_KEY_ID"),
-                    "spark.hadoop.fs.s3a.secret.key":  os.getenv("AWS_SECRET_ACCESS_KEY"),
-                    "spark.hadoop.fs.s3a.endpoint.region":  os.getenv("AWS_REGION"),
+                    "spark.hadoop.fs.s3a.access.key": "${AWS_ACCESS_KEY_ID}",
+                    "spark.hadoop.fs.s3a.secret.key": "${AWS_SECRET_ACCESS_KEY}",
+                    "spark.hadoop.fs.s3a.endpoint.region": "${AWS_REGION}",
                     "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
                     "spark.hadoop.fs.s3a.fast.upload": "true",
                     "spark.hadoop.fs.s3a.multipart.size": "67108864",
