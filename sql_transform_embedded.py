@@ -11,12 +11,13 @@ import json
 import re
 import traceback
 from pyspark.sql import SparkSession
+from pyspark.sql.utils import AnalysisException
 
 # -----------------------------
 # ICEBERG FEATURE CONFIG (hardcoded here)
 # -----------------------------
 ICEBERG_ENABLED = True  # Enabled — assumes Iceberg + Nessie jars are present in the Spark image
-ICEBERG_CATALOG_NAME = "nessie_catalog"  # Spark catalog name to register for Iceberg
+ICEBERG_CATALOG_NAME = "iceberg"  # Spark catalog name to register for Iceberg
 ICEBERG_WAREHOUSE = "s3://airbytedestination1/iceberg/"  # Iceberg warehouse path
 # If you want a specific target table, set in format: catalog.namespace.table
 ICEBERG_TARGET_TABLE_OVERRIDE = None
@@ -84,6 +85,16 @@ def ensure_namespace(spark, catalog: str, namespace: str):
         print(f"Warning: could not CREATE NAMESPACE {catalog}.{namespace}: {e}")
 
 
+def _is_table_not_found_exc(e: Exception) -> bool:
+    """
+    Detect AnalysisException messages that indicate the Iceberg table is missing.
+    We look for common markers seen in Spark/AnalysisException messages.
+    """
+    msg = str(e) if e is not None else ""
+    markers = ["TABLE_OR_VIEW_NOT_FOUND", "UnresolvedRelation", "Table or view not found"]
+    return any(m in msg for m in markers)
+
+
 def main():
     print("🚀 Starting SQL transformation...")
 
@@ -142,7 +153,7 @@ def main():
     try:
         print("📂 Reading source data...")
         combined_df = None
-        for i, source_path in enumerate(json.loads(sources_json)):
+        for i, source_path in enumerate(source_paths):
             print(f"   Reading from: {source_path}")
             try:
                 df = spark.read.parquet(source_path)
@@ -190,28 +201,60 @@ def main():
 
             print(f"📥 Reading back Parquet from {destination_path} for Iceberg write")
             iceberg_df = spark.read.parquet(destination_path)
+            iceberg_df.persist()  # keep in memory during potential retries
 
             try:
+                # Attempt to append normally (preserves default behavior)
                 if ICEBERG_WRITE_MODE == "append":
-                    iceberg_df.writeTo(target_table).append()
+                    try:
+                        print(f"Attempting to append to {target_table} ...")
+                        iceberg_df.writeTo(target_table).append()
+                        print("Append succeeded.")
+                    except AnalysisException as e:
+                        # Table might not exist — try to create then write
+                        if _is_table_not_found_exc(e):
+                            print(
+                                f"Table {target_table} not found in catalog; creating table and writing data..."
+                            )
+                            # createOrReplace will create the table when missing.
+                            # It's used here only in the missing-table scenario so we don't
+                            # accidentally replace existing tables.
+                            iceberg_df.writeTo(target_table).createOrReplace()
+                            print("Table created and data written with createOrReplace().")
+                        else:
+                            # Re-raise unexpected AnalysisExceptions
+                            raise
                 elif ICEBERG_WRITE_MODE == "overwrite":
                     try:
                         iceberg_df.writeTo(target_table).overwritePartitions()
+                        print("overwritePartitions() succeeded.")
                     except Exception:
+                        print("overwritePartitions() failed; falling back to createOrReplace()")
                         iceberg_df.writeTo(target_table).createOrReplace()
+                        print("createOrReplace() completed.")
                 else:
+                    # create_or_replace or any other mode--create or replace
                     try:
                         iceberg_df.writeTo(target_table).createOrReplace()
+                        print("createOrReplace() completed.")
                     except AttributeError:
                         try:
                             iceberg_df.writeTo(target_table).create()
+                            print("create() completed.")
                         except Exception:
                             iceberg_df.writeTo(target_table).append()
+                            print("append() completed (fallback).")
+
                 print("🎉 Iceberg write completed successfully")
             except Exception as e:
                 print(f"❌ ERROR writing to Iceberg table {target_table}: {e}")
                 traceback.print_exc()
                 sys.exit(1)
+            finally:
+                try:
+                    iceberg_df.unpersist()
+                except Exception:
+                    pass
         else:
             print("ℹ️ Iceberg step is disabled")
 
