@@ -121,11 +121,11 @@ def configure_s3a(spark):
         spark.conf.set("spark.hadoop.fs.s3.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
 
         # credentials: if env var AWS_ACCESS_KEY_ID is present, use simple provider (explicit keys)
-        aws_access_key = "AKIAZI2LB6Y7EL5X6PCJ"
+        aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
         # os.getenv("AWS_ACCESS_KEY_ID") or os.getenv("AWS_ACCESS_KEY")
 
         # os.getenv("AWS_ACCESS_KEY_ID") or os.getenv("AWS_ACCESS_KEY")
-        aws_secret_key = "22qYxeGWBU1wwBPR2y2/X0cO21RXH5s4cNI7P+tq"
+        aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
         # os.getenv("AWS_SECRET_ACCESS_KEY") or os.getenv("AWS_SECRET_KEY")
 
         # os.getenv("AWS_SECRET_ACCESS_KEY") or os.getenv("AWS_SECRET_KEY")
