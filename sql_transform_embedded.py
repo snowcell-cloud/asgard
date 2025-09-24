@@ -105,6 +105,7 @@ def _is_table_not_found_exc(e: Exception) -> bool:
 
 
 def configure_s3a(spark):
+
     """
     Configure Spark/Hadoop to use S3A. This sets:
       - fs.s3a.impl and maps legacy s3 scheme to S3A implementation
@@ -113,14 +114,21 @@ def configure_s3a(spark):
     NOTE: The runtime must still include the appropriate `hadoop-aws` and AWS SDK jars
     on the driver and executors (via --jars or in the image).
     """
+
     try:
         # force S3A implementation and map plain "s3" scheme to the S3A impl
         spark.conf.set("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
         spark.conf.set("spark.hadoop.fs.s3.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
 
         # credentials: if env var AWS_ACCESS_KEY_ID is present, use simple provider (explicit keys)
-        aws_access_key = os.getenv("AWS_ACCESS_KEY_ID") or os.getenv("AWS_ACCESS_KEY")
-        aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY") or os.getenv("AWS_SECRET_KEY")
+        aws_access_key = "AKIAZI2LB6Y7EL5X6PCJ"
+        # os.getenv("AWS_ACCESS_KEY_ID") or os.getenv("AWS_ACCESS_KEY")
+
+        # os.getenv("AWS_ACCESS_KEY_ID") or os.getenv("AWS_ACCESS_KEY")
+        aws_secret_key = "22qYxeGWBU1wwBPR2y2/X0cO21RXH5s4cNI7P+tq"
+        # os.getenv("AWS_SECRET_ACCESS_KEY") or os.getenv("AWS_SECRET_KEY")
+
+        # os.getenv("AWS_SECRET_ACCESS_KEY") or os.getenv("AWS_SECRET_KEY")
         aws_session_token = os.getenv("AWS_SESSION_TOKEN")
         if aws_access_key and aws_secret_key:
             print(
@@ -152,7 +160,8 @@ def configure_s3a(spark):
             )
 
         # optional region
-        s3_region = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION")
+        s3_region = "eu-north-1"
+        # os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION")
         if s3_region:
             spark.conf.set("spark.hadoop.fs.s3a.endpoint.region", s3_region)
 
