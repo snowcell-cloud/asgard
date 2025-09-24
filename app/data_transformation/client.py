@@ -10,7 +10,7 @@ import os
 
 
 class SparkApplicationClient:
-    """Clien                    "env": [
+    """Client                    "env": [
         {
             "name": "AWS_ACCESS_KEY_ID",
             "valueFrom": {

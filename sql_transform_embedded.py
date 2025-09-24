@@ -17,7 +17,7 @@ from pyspark.sql.utils import AnalysisException
 # ICEBERG FEATURE CONFIG (hardcoded here)
 # -----------------------------
 ICEBERG_ENABLED = True  # Enabled — assumes Iceberg + Nessie jars are present in the Spark image
-ICEBERG_CATALOG_NAME = "iceberg"  # Spark catalog name to register for Iceberg
+ICEBERG_CATALOG_NAME = "nessie "  # Spark catalog name to register for Iceberg
 ICEBERG_WAREHOUSE = "s3a://airbytedestination1/iceberg/"  # Iceberg warehouse path (use s3a)
 # If you want a specific target table, set in format: catalog.namespace.table
 ICEBERG_TARGET_TABLE_OVERRIDE = None
@@ -203,17 +203,28 @@ def main():
 
     if ICEBERG_ENABLED:
         try:
-            # Register Iceberg catalog (Nessie)
-            spark.conf.set(
-                f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}", "org.apache.iceberg.spark.SparkCatalog"
-            )
+            # Use a clean catalog name (no trailing spaces) and s3a warehouse path
+            # ICEBERG_CATALOG_NAME must match the prefix used for spark.sql.catalog.<name>.*
+            spark.conf.set(f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}", "org.apache.iceberg.spark.SparkCatalog")
+            # Tell Spark to use the NessieCatalog implementation for the catalog
             spark.conf.set(
                 f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}.catalog-impl",
                 "org.apache.iceberg.nessie.NessieCatalog",
             )
-            spark.conf.set(f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}.uri", NESSIE_URI)
+            # Point at Nessie server and branch/ref
+            spark.conf.set(
+                f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}.uri",
+                NESSIE_URI,
+            )
             spark.conf.set(f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}.ref", NESSIE_REF)
-            spark.conf.set(f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}.warehouse", ICEBERG_WAREHOUSE)
+
+            # Use s3a scheme for Iceberg warehouse (so Spark uses S3A implementation)
+            # ICEBERG_WAREHOUSE should be an S3A path like 's3a://bucket/iceberg' (no trailing slash)
+            spark.conf.set(
+                f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}.warehouse",
+                ICEBERG_WAREHOUSE,
+            )
+
             print(
                 f"Configured Iceberg Nessie catalog '{ICEBERG_CATALOG_NAME}' -> uri={NESSIE_URI} ref={NESSIE_REF} warehouse={ICEBERG_WAREHOUSE}"
             )
