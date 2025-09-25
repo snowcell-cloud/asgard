@@ -234,6 +234,7 @@ class SparkApplicationFactory:
                     "cores": driver_cores,
                     "memory": driver_memory,
                     "serviceAccount": service_account,
+                    "volumeMounts": [{"name": "job-code", "mountPath": "/opt/spark/app"}],
                     "envFrom": [{"secretRef": {"name": s3_secret_name}}],
                     "env": [
                         {
@@ -268,6 +269,7 @@ class SparkApplicationFactory:
                     "cores": executor_cores,
                     "instances": executor_instances,
                     "memory": executor_memory,
+                    "volumeMounts": [{"name": "job-code", "mountPath": "/opt/spark/app"}],
                     "envFrom": [{"secretRef": {"name": s3_secret_name}}],
                     "env": [
                         {

@@ -170,14 +170,10 @@ def main():
     # Configure S3A BEFORE registering Iceberg catalog (so executors see S3A impl)
     configure_s3a(spark)
 
-    sql_query = spark.conf.get("spark.sql.transform.query", None) or os.getenv("SQL_QUERY")
-    sources_json = spark.conf.get("spark.sql.transform.sources", None) or os.getenv("SOURCE_PATHS")
-    destination_path = spark.conf.get("spark.sql.transform.destination", None) or os.getenv(
-        "DESTINATION_PATH"
-    )
-    write_mode = spark.conf.get("spark.sql.transform.writeMode", None) or os.getenv(
-        "WRITE_MODE", "overwrite"
-    )
+    sql_query = spark.conf.get("spark.sql.transform.query", None) 
+    sources_json = spark.conf.get("spark.sql.transform.sources", None)
+    destination_path = spark.conf.get("spark.sql.transform.destination", None)
+    write_mode = spark.conf.get("spark.sql.transform.writeMode", None)
 
     if not sql_query:
         print("❌ ERROR: SQL query is required")
