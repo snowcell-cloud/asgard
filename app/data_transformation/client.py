@@ -370,8 +370,8 @@ class SparkApplicationFactory:
             "spark.sql.adaptive.enabled": "true",
             "spark.sql.adaptive.coalescePartitions.enabled": "true",
             "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-            "spark.hadoop.fs.s3a.access.key":  "dsfasdfas",
-            "spark.hadoop.fs.s3a.secret.key": "dfasfasdfa",
+            "spark.hadoop.fs.s3a.access.key": os.getenv("AWS_ACCESS_KEY_ID"),
+            "spark.hadoop.fs.s3a.secret.key": os.getenv("AWS_SECRET_ACCESS_KEY"),
             "spark.hadoop.fs.s3a.endpoint.region": os.getenv("AWS_REGION", "eu-north-1"),
             "spark.hadoop.fs.s3a.endpoint": s3_endpoint,
             "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
@@ -419,13 +419,29 @@ class SparkApplicationFactory:
                     "cores": driver_cores,
                     "memory": driver_memory,
                     "serviceAccount": service_account,
-                    # Copy whole secret as env vars (backwards compatible)
                     "envFrom": [{"secretRef": {"name": s3_secret_name}}],
-                    # Also add explicit valueFrom.secretKeyRef entries (matches your successful manifest)
                     "env": [
-                        *_env_to_list(
-                            aws_env_entries := aws_env_entries
-                        ),  # expands the AWS env entries
+                        {
+                            "name": "AWS_ACCESS_KEY_ID",
+                            "valueFrom": {
+                                "secretKeyRef": {"name": s3_secret_name, "key": "AWS_ACCESS_KEY_ID"}
+                            },
+                        },
+                        {
+                            "name": "AWS_SECRET_ACCESS_KEY",
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "name": s3_secret_name,
+                                    "key": "AWS_SECRET_ACCESS_KEY",
+                                }
+                            },
+                        },
+                        {
+                            "name": "AWS_REGION",
+                            "valueFrom": {
+                                "secretKeyRef": {"name": s3_secret_name, "key": "AWS_REGION"}
+                            },
+                        },
                         {"name": "SQL_QUERY", "value": sql},
                         {"name": "SOURCE_PATHS", "value": json.dumps(sources)},
                         {"name": "DESTINATION_PATH", "value": destination},
@@ -439,7 +455,27 @@ class SparkApplicationFactory:
                     "memory": executor_memory,
                     "envFrom": [{"secretRef": {"name": s3_secret_name}}],
                     "env": [
-                        *_env_to_list(aws_env_entries),
+                        {
+                            "name": "AWS_ACCESS_KEY_ID",
+                            "valueFrom": {
+                                "secretKeyRef": {"name": s3_secret_name, "key": "AWS_ACCESS_KEY_ID"}
+                            },
+                        },
+                        {
+                            "name": "AWS_SECRET_ACCESS_KEY",
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "name": s3_secret_name,
+                                    "key": "AWS_SECRET_ACCESS_KEY",
+                                }
+                            },
+                        },
+                        {
+                            "name": "AWS_REGION",
+                            "valueFrom": {
+                                "secretKeyRef": {"name": s3_secret_name, "key": "AWS_REGION"}
+                            },
+                        },
                         {"name": "SQL_QUERY", "value": sql},
                         {"name": "SOURCE_PATHS", "value": json.dumps(sources)},
                         {"name": "DESTINATION_PATH", "value": destination},

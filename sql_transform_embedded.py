@@ -148,7 +148,7 @@ def configure_s3a(spark):
         # Order matters: environment -> default chain (which includes instance profile, etc.)
         spark.conf.set(
             "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "com.amazonaws.auth.EnvironmentVariableCredentialsProvider,com.amazonaws.auth.DefaultAWSCredentialsProviderChain",
+            "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
         )
 
         # optional S3-compatible endpoint or path style access (for MinIO / S3-compatible)
