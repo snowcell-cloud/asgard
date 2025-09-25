@@ -119,10 +119,10 @@ def configure_s3a(spark):
         spark.conf.set("spark.hadoop.fs.s3.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
 
         # Read credentials from environment variables (not Spark config)
-        aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
-        aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-        aws_session_token = os.getenv("AWS_SESSION_TOKEN")
-        aws_region = os.getenv("AWS_REGION")
+        aws_access_key = spark.conf.get("spark.hadoop.fs.s3a.access.key", None)
+        aws_secret_key = spark.conf.get("spark.hadoop.fs.s3a.secret.key", None)
+        aws_session_token = spark.conf.get("spark.hadoop.fs.s3a.session.token", None)
+        aws_region = spark.conf.get("spark.hadoop.fs.s3a.region", None)
 
         if aws_access_key and aws_secret_key:
             print(
