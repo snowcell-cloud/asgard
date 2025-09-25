@@ -194,24 +194,12 @@ class SparkApplicationFactory:
                     "envFrom": [{"secretRef": {"name": s3_secret_name}}],
                     "env": [
                         {
-                            "name": "AWS_ACCESS_KEY_ID",
-                            "valueFrom": {
-                                "secretKeyRef": {"name": s3_secret_name, "key": "AWS_ACCESS_KEY_ID"}
-                            },
-                        },
-                        {
-                            "name": "AWS_SECRET_ACCESS_KEY",
+                            "name": "AWS_SECRET_KEY",
                             "valueFrom": {
                                 "secretKeyRef": {
                                     "name": s3_secret_name,
                                     "key": "AWS_SECRET_ACCESS_KEY",
                                 }
-                            },
-                        },
-                        {
-                            "name": "AWS_REGION",
-                            "valueFrom": {
-                                "secretKeyRef": {"name": s3_secret_name, "key": "AWS_REGION"}
                             },
                         },
                         {"name": "SQL_QUERY", "value": sql},
@@ -229,24 +217,12 @@ class SparkApplicationFactory:
                     "envFrom": [{"secretRef": {"name": s3_secret_name}}],
                     "env": [
                         {
-                            "name": "AWS_ACCESS_KEY_ID",
-                            "valueFrom": {
-                                "secretKeyRef": {"name": s3_secret_name, "key": "AWS_ACCESS_KEY_ID"}
-                            },
-                        },
-                        {
-                            "name": "AWS_SECRET_ACCESS_KEY",
+                            "name": "AWS_SECRET_KEY",
                             "valueFrom": {
                                 "secretKeyRef": {
                                     "name": s3_secret_name,
                                     "key": "AWS_SECRET_ACCESS_KEY",
                                 }
-                            },
-                        },
-                        {
-                            "name": "AWS_REGION",
-                            "valueFrom": {
-                                "secretKeyRef": {"name": s3_secret_name, "key": "AWS_REGION"}
                             },
                         },
                         {"name": "SQL_QUERY", "value": sql},
@@ -259,6 +235,7 @@ class SparkApplicationFactory:
                     "spark.sql.adaptive.enabled": "true",
                     "spark.sql.adaptive.coalescePartitions.enabled": "true",
                     "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
+
                     "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
                     "spark.hadoop.fs.s3a.fast.upload": "true",
                     "spark.hadoop.fs.s3a.multipart.size": "67108864",
