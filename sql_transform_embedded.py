@@ -17,8 +17,10 @@ from pyspark.sql.utils import AnalysisException
 # ICEBERG FEATURE CONFIG (hardcoded here)
 # -----------------------------
 ICEBERG_ENABLED = True  # Enabled — assumes Iceberg + Nessie jars are present in the Spark image
-ICEBERG_CATALOG_NAME = "nessie "  # Spark catalog name to register for Iceberg
-ICEBERG_WAREHOUSE = "s3a://airbytedestination1/iceberg/"  # Iceberg warehouse path (use s3a)
+ICEBERG_CATALOG_NAME = "nessie"  # Spark catalog name to register for Iceberg (no trailing spaces)
+ICEBERG_WAREHOUSE = (
+    "s3a://airbytedestination1/iceberg"  # Iceberg warehouse path (use s3a, no trailing slash)
+)
 # If you want a specific target table, set in format: catalog.namespace.table
 ICEBERG_TARGET_TABLE_OVERRIDE = None
 # Options: "create_or_replace" (default), "append", "overwrite"
@@ -89,6 +91,7 @@ def derive_table_from_s3_path(
 
 def ensure_namespace(spark, catalog: str, namespace: str):
     try:
+        # Use quoted identifier if needed (but most catalog implementations accept plain names)
         spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {catalog}.{namespace}")
     except Exception as e:
         print(f"Warning: could not CREATE NAMESPACE {catalog}.{namespace}: {e}")
@@ -100,12 +103,16 @@ def _is_table_not_found_exc(e: Exception) -> bool:
     We look for common markers seen in Spark/AnalysisException messages.
     """
     msg = str(e) if e is not None else ""
-    markers = ["TABLE_OR_VIEW_NOT_FOUND", "UnresolvedRelation", "Table or view not found"]
+    markers = [
+        "TABLE_OR_VIEW_NOT_FOUND",
+        "UnresolvedRelation",
+        "Table or view not found",
+        "Cannot find table",
+    ]
     return any(m in msg for m in markers)
 
 
 def configure_s3a(spark):
-
     """
     Configure Spark/Hadoop to use S3A. This sets:
       - fs.s3a.impl and maps legacy s3 scheme to S3A implementation
@@ -120,52 +127,74 @@ def configure_s3a(spark):
         spark.conf.set("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
         spark.conf.set("spark.hadoop.fs.s3.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
 
-        # credentials: if env var AWS_ACCESS_KEY_ID is present, use simple provider (explicit keys)
+        # Read environment credentials if present
         aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
-        # os.getenv("AWS_ACCESS_KEY_ID") or os.getenv("AWS_ACCESS_KEY")
-
-        # os.getenv("AWS_ACCESS_KEY_ID") or os.getenv("AWS_ACCESS_KEY")
         aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-        # os.getenv("AWS_SECRET_ACCESS_KEY") or os.getenv("AWS_SECRET_KEY")
-
-        # os.getenv("AWS_SECRET_ACCESS_KEY") or os.getenv("AWS_SECRET_KEY")
         aws_session_token = os.getenv("AWS_SESSION_TOKEN")
+
         if aws_access_key and aws_secret_key:
+            # If explicit env credentials are present, set them into hadoop config.
+            # This is optional because the provider chain below will also read env vars,
+            # but setting them explicitly avoids some older-hadoop SDK provider issues.
             print(
-                "Configuring S3A to use AWS keys from environment (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)"
+                "Configuring S3A to use AWS keys from environment (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)."
             )
             spark.conf.set("spark.hadoop.fs.s3a.access.key", aws_access_key)
             spark.conf.set("spark.hadoop.fs.s3a.secret.key", aws_secret_key)
             if aws_session_token:
                 spark.conf.set("spark.hadoop.fs.s3a.session.token", aws_session_token)
-            # provider: simple credential provider
-            spark.conf.set(
-                "spark.hadoop.fs.s3a.aws.credentials.provider",
-                "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-            )
-        else:
-            # Use default provider chain (instance profile, environment, etc.)
-            spark.conf.set(
-                "spark.hadoop.fs.s3a.aws.credentials.provider",
-                "com.amazonaws.auth.DefaultAWSCredentialsProviderChain",
-            )
+
+        # Prefer environment variable provider first, then fall back to default provider chain
+        # Order matters: environment -> default chain (which includes instance profile, etc.)
+        spark.conf.set(
+            "spark.hadoop.fs.s3a.aws.credentials.provider",
+            "com.amazonaws.auth.EnvironmentVariableCredentialsProvider,com.amazonaws.auth.DefaultAWSCredentialsProviderChain",
+        )
 
         # optional S3-compatible endpoint or path style access (for MinIO / S3-compatible)
         s3_endpoint = os.getenv("S3_ENDPOINT")
         if s3_endpoint:
             spark.conf.set("spark.hadoop.fs.s3a.endpoint", s3_endpoint)
             # often required for S3-compatible backends:
-            spark.conf.set(
-                "spark.hadoop.fs.s3a.path.style.access", os.getenv("S3_PATH_STYLE", "true")
+            path_style = os.getenv("S3_PATH_STYLE", "true")
+            spark.conf.set("spark.hadoop.fs.s3a.path.style.access", path_style)
+
+        # optional region - use from environment or default to eu-north-1
+        s3_region = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION")
+        if s3_region:
+            # set both endpoint.region and aws.region style properties where relevant
+            spark.conf.set("spark.hadoop.fs.s3a.endpoint.region", s3_region)
+            spark.conf.set("spark.hadoop.fs.s3a.aws.region", s3_region)
+
+        # performance / implementation tweaks
+        spark.conf.set("spark.hadoop.fs.s3a.fast.upload", "true")
+        spark.conf.set("spark.hadoop.fs.s3a.multipart.size", "67108864")
+        spark.conf.set("spark.hadoop.fs.s3a.connection.ssl.enabled", "true")
+
+        # Ensure SigV4 where necessary
+        spark.conf.set("spark.driver.extraJavaOptions", "-Dcom.amazonaws.services.s3.enableV4=true")
+        spark.conf.set(
+            "spark.executor.extraJavaOptions", "-Dcom.amazonaws.services.s3.enableV4=true"
+        )
+
+        # Quick runtime checks (informative): are credentials visible in env?
+        visible_envs = {
+            "AWS_ACCESS_KEY_ID": bool(aws_access_key),
+            "AWS_SECRET_ACCESS_KEY": bool(aws_secret_key),
+            "AWS_SESSION_TOKEN": bool(aws_session_token),
+            "AWS_REGION": bool(s3_region),
+            "S3_ENDPOINT": bool(s3_endpoint),
+        }
+        print("S3A configuration applied (fs.s3a.impl, credentials provider, endpoint if present).")
+        print("S3 env visibility:", visible_envs)
+
+        if not (aws_access_key and aws_secret_key):
+            print(
+                "Warning: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY not found in environment. "
+                "If you expect to use IRSA / instance profile / node role, this may be OK. "
+                "Otherwise ensure the Kubernetes Secret with AWS keys is injected into pods."
             )
 
-        # optional region
-        s3_region = "eu-north-1"
-        # os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION")
-        if s3_region:
-            spark.conf.set("spark.hadoop.fs.s3a.endpoint.region", s3_region)
-
-        print("S3A configuration applied (fs.s3a.impl, credentials provider, endpoint if present).")
     except Exception as e:
         print(f"Warning: failed to set S3A-related Spark/Hadoop configs: {e}")
 
@@ -173,12 +202,15 @@ def configure_s3a(spark):
 def main():
     print("🚀 Starting SQL transformation...")
 
+    # Build Spark session
+    # NOTE: we configure S3A after SparkSession creation (sufficient in most deployments).
     spark = SparkSession.builder.appName("SQL Data Transformation").getOrCreate()
     print("✅ Spark session created")
 
     # Configure S3A BEFORE registering Iceberg catalog (so executors see S3A impl)
     configure_s3a(spark)
 
+    # Read parameters from sparkConf first then environment
     sql_query = spark.conf.get("spark.sql.transform.query", None) or os.getenv("SQL_QUERY")
     sources_json = spark.conf.get("spark.sql.transform.sources", None) or os.getenv("SOURCE_PATHS")
     destination_path = spark.conf.get("spark.sql.transform.destination", None) or os.getenv(
@@ -212,27 +244,17 @@ def main():
 
     if ICEBERG_ENABLED:
         try:
-            # Use a clean catalog name (no trailing spaces) and s3a warehouse path
-            # ICEBERG_CATALOG_NAME must match the prefix used for spark.sql.catalog.<name>.*
-            spark.conf.set(f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}", "org.apache.iceberg.spark.SparkCatalog")
-            # Tell Spark to use the NessieCatalog implementation for the catalog
+            # Use clean catalog name and set Iceberg catalog config
+            spark.conf.set(
+                f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}", "org.apache.iceberg.spark.SparkCatalog"
+            )
             spark.conf.set(
                 f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}.catalog-impl",
                 "org.apache.iceberg.nessie.NessieCatalog",
             )
-            # Point at Nessie server and branch/ref
-            spark.conf.set(
-                f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}.uri",
-                NESSIE_URI,
-            )
+            spark.conf.set(f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}.uri", NESSIE_URI)
             spark.conf.set(f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}.ref", NESSIE_REF)
-
-            # Use s3a scheme for Iceberg warehouse (so Spark uses S3A implementation)
-            # ICEBERG_WAREHOUSE should be an S3A path like 's3a://bucket/iceberg' (no trailing slash)
-            spark.conf.set(
-                f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}.warehouse",
-                ICEBERG_WAREHOUSE,
-            )
+            spark.conf.set(f"spark.sql.catalog.{ICEBERG_CATALOG_NAME}.warehouse", ICEBERG_WAREHOUSE)
 
             print(
                 f"Configured Iceberg Nessie catalog '{ICEBERG_CATALOG_NAME}' -> uri={NESSIE_URI} ref={NESSIE_REF} warehouse={ICEBERG_WAREHOUSE}"
@@ -251,6 +273,8 @@ def main():
                 print(f"   ✅ Successfully read source {i+1}")
             except Exception as e:
                 print(f"   ⚠️  Warning: Could not read from {source_path}: {e}")
+                # If credential errors occur, they will include NoAuthWithAWSException / Unable to load AWS credentials
+                # Continue to try other sources if any
                 continue
 
         if combined_df is None:
@@ -258,11 +282,19 @@ def main():
             sys.exit(1)
 
         combined_df.createOrReplaceTempView("source_data")
-        print(f"✅ Created temporary view 'source_data' with {combined_df.count()} rows")
+        try:
+            row_count = combined_df.count()
+        except Exception:
+            row_count = "unknown"
+        print(f"✅ Created temporary view 'source_data' with {row_count} rows")
 
         print("🔄 Executing SQL transformation...")
         result_df = spark.sql(sql_query)
-        print(f"✅ SQL executed successfully, result has {result_df.count()} rows")
+        try:
+            result_count = result_df.count()
+        except Exception:
+            result_count = "unknown"
+        print(f"✅ SQL executed successfully, result has {result_count} rows")
 
         print(f"💾 Writing results to: {destination_path}")
         result_df.write.mode(write_mode).parquet(destination_path)
@@ -306,7 +338,6 @@ def main():
                             print(
                                 f"Table {target_table} not found in catalog; creating table and writing data..."
                             )
-                            # createOrReplace will create the table when missing.
                             iceberg_df.writeTo(target_table).createOrReplace()
                             print("Table created and data written with createOrReplace().")
                         else:
@@ -351,7 +382,10 @@ def main():
         traceback.print_exc()
         sys.exit(1)
     finally:
-        spark.stop()
+        try:
+            spark.stop()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
