@@ -119,12 +119,12 @@ def configure_s3a(spark):
         spark.conf.set("spark.hadoop.fs.s3.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
 
         # credentials: if env var AWS_ACCESS_KEY_ID is present, use simple provider (explicit keys)
-        aws_access_key = os.getenv("AWS_ACCESS_KEY_ID") or os.getenv("AWS_ACCESS_KEY")
-        aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY") or os.getenv("AWS_SECRET_KEY")
-        aws_session_token = os.getenv("AWS_SESSION_TOKEN")
+        aws_access_key = spark.conf.get("spark.hadoop.fs.s3a.access.key", None)
+        aws_secret_key =  spark.conf.get("spark.hadoop.fs.s3a.secret.key", None)
+        aws_session_token =  spark.conf.get("spark.hadoop.fs.s3a.session.token", None)
         if aws_access_key and aws_secret_key:
             print(
-                "Configuring S3A to use AWS keys from environment (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)"
+                "🤞 Configuring S3A to use AWS keys from environment (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)"
             )
             spark.conf.set("spark.hadoop.fs.s3a.access.key", aws_access_key)
             spark.conf.set("spark.hadoop.fs.s3a.secret.key", aws_secret_key)
@@ -143,16 +143,16 @@ def configure_s3a(spark):
             )
 
         # optional S3-compatible endpoint or path style access (for MinIO / S3-compatible)
-        s3_endpoint = os.getenv("S3_ENDPOINT")
+        s3_endpoint = spark.conf.get("spark.hadoop.fs.s3a.endpoint", None)
         if s3_endpoint:
             spark.conf.set("spark.hadoop.fs.s3a.endpoint", s3_endpoint)
             # often required for S3-compatible backends:
             spark.conf.set(
-                "spark.hadoop.fs.s3a.path.style.access", os.getenv("S3_PATH_STYLE", "true")
+                "spark.hadoop.fs.s3a.path.style.access", spark.conf.get("spark.hadoop.fs.s3a.path.style.access", "true")
             )
 
         # optional region
-        s3_region = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION")
+        s3_region = spark.conf.get("spark.hadoop.fs.s3a.endpoint.region", None)
         if s3_region:
             spark.conf.set("spark.hadoop.fs.s3a.endpoint.region", s3_region)
 
