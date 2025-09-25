@@ -162,7 +162,7 @@ def configure_s3a(spark):
 
 
 def main():
-    print("🚀 Starting SQL transformation...")
+    print("🚀 Starting SQL transformation embedded config amp... ")
 
     spark = SparkSession.builder.appName("SQL Data Transformation").getOrCreate()
     print("✅ Spark session created")
