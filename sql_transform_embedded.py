@@ -118,10 +118,12 @@ def configure_s3a(spark):
         spark.conf.set("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
         spark.conf.set("spark.hadoop.fs.s3.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
 
-        # credentials: if env var AWS_ACCESS_KEY_ID is present, use simple provider (explicit keys)
-        aws_access_key = spark.conf.get("spark.hadoop.fs.s3a.access.key", None)
-        aws_secret_key =  spark.conf.get("spark.hadoop.fs.s3a.secret.key", None)
-        aws_session_token =  spark.conf.get("spark.hadoop.fs.s3a.session.token", None)
+        # Read credentials from environment variables (not Spark config)
+        aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
+        aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+        aws_session_token = os.getenv("AWS_SESSION_TOKEN")
+        aws_region = os.getenv("AWS_REGION")
+
         if aws_access_key and aws_secret_key:
             print(
                 "🤞 Configuring S3A to use AWS keys from environment (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)"
@@ -136,25 +138,26 @@ def configure_s3a(spark):
                 "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
             )
         else:
+            print("🔄 Using default AWS credentials provider chain")
             # Use default provider chain (instance profile, environment, etc.)
             spark.conf.set(
                 "spark.hadoop.fs.s3a.aws.credentials.provider",
                 "com.amazonaws.auth.DefaultAWSCredentialsProviderChain",
             )
 
+        # Set region if available
+        if aws_region:
+            spark.conf.set("spark.hadoop.fs.s3a.endpoint.region", aws_region)
+
         # optional S3-compatible endpoint or path style access (for MinIO / S3-compatible)
-        s3_endpoint = spark.conf.get("spark.hadoop.fs.s3a.endpoint", None)
+        s3_endpoint = os.getenv("S3_ENDPOINT")
         if s3_endpoint:
             spark.conf.set("spark.hadoop.fs.s3a.endpoint", s3_endpoint)
             # often required for S3-compatible backends:
-            spark.conf.set(
-                "spark.hadoop.fs.s3a.path.style.access", spark.conf.get("spark.hadoop.fs.s3a.path.style.access", "true")
-            )
-
-        # optional region
-        s3_region = spark.conf.get("spark.hadoop.fs.s3a.endpoint.region", None)
-        if s3_region:
-            spark.conf.set("spark.hadoop.fs.s3a.endpoint.region", s3_region)
+            spark.conf.set("spark.hadoop.fs.s3a.path.style.access", "true")
+        else:
+            # For regular AWS S3, use virtual-hosted style
+            spark.conf.set("spark.hadoop.fs.s3a.path.style.access", "false")
 
         print("S3A configuration applied (fs.s3a.impl, credentials provider, endpoint if present).")
     except Exception as e:
@@ -170,7 +173,7 @@ def main():
     # Configure S3A BEFORE registering Iceberg catalog (so executors see S3A impl)
     configure_s3a(spark)
 
-    sql_query = spark.conf.get("spark.sql.transform.query", None) 
+    sql_query = spark.conf.get("spark.sql.transform.query", None)
     sources_json = spark.conf.get("spark.sql.transform.sources", None)
     destination_path = spark.conf.get("spark.sql.transform.destination", None)
     write_mode = spark.conf.get("spark.sql.transform.writeMode", None)
