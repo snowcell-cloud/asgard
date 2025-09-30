@@ -1,0 +1,51 @@
+version: 2
+
+sources:
+  - name: silver_layer
+    description: "Silver layer tables from S3/Iceberg containing cleaned and standardized data"
+    schema: silver
+    tables:
+      - name: customer_data
+        description: "Customer master data from various sources"
+        columns:
+          - name: customer_id
+            description: "Unique customer identifier"
+            tests:
+              - unique
+              - not_null
+          - name: email
+            description: "Customer email address"
+          - name: created_at
+            description: "Customer creation timestamp"
+
+      - name: transaction_data
+        description: "Transaction records from payment systems"
+        columns:
+          - name: transaction_id
+            description: "Unique transaction identifier"
+            tests:
+              - unique
+              - not_null
+          - name: customer_id
+            description: "Customer who made the transaction"
+            tests:
+              - not_null
+          - name: amount
+            description: "Transaction amount"
+          - name: transaction_date
+            description: "Date of transaction"
+
+      - name: product_data
+        description: "Product catalog information"
+        columns:
+          - name: product_id
+            description: "Unique product identifier"
+            tests:
+              - unique
+              - not_null
+          - name: product_name
+            description: "Product name"
+          - name: category
+            description: "Product category"
+          - name: price
+            description: "Product price"

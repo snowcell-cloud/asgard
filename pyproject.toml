@@ -18,6 +18,8 @@ dependencies = [
   "requests>=2.31.0",
   "kubernetes>=33.1.0",
   "pyspark>=4.0.0",
+  "dbt-core>=1.6.0",
+  "dbt-trino>=1.6.0",
 ]
 
 [project.optional-dependencies]

@@ -1,0 +1,68 @@
+name: "asgard_data_products"
+version: "1.0.0"
+config-version: 2
+
+# This setting configures which "profile" dbt uses for this project.
+profile: "asgard_data_products"
+
+# These configurations specify where dbt should look for different types of files.
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets: # directories to be removed by `dbt clean`
+  - "target"
+  - "dbt_packages"
+
+# Configure materialization defaults
+models:
+  asgard_data_products:
+    # Config indicated by + and applies to all files under models/...
+    +materialized: table
+    +file_format: iceberg
+
+    # Source models (from silver layer)
+    staging:
+      +materialized: view
+
+    # Intermediate transformations
+    intermediate:
+      +materialized: view
+
+    # Final data products
+    data_products:
+      +materialized: table
+      +file_format: iceberg
+      +table_properties:
+        write.format.default: parquet
+        write.parquet.compression-codec: snappy
+
+    # Metrics and aggregations
+    metrics:
+      +materialized: table
+      +file_format: iceberg
+
+# Snapshot configurations
+snapshots:
+  asgard_data_products:
+    +target_schema: snapshots
+    +file_format: iceberg
+
+# Variables for data product framework
+vars:
+  # S3/Iceberg configuration
+  iceberg_warehouse: "s3a://airbytedestination1/iceberg/"
+  nessie_uri: "http://nessie.data-platform.svc.cluster.local:19120/api/v1"
+  nessie_ref: "main"
+
+  # Data layers
+  bronze_schema: "bronze"
+  silver_schema: "silver"
+  gold_schema: "gold"
+
+  # Data product metadata
+  data_product_owner: "data-platform-team"
+  data_product_environment: "production"

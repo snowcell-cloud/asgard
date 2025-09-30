@@ -1,0 +1,28 @@
+asgard_data_products:
+  target: dev
+  outputs:
+    dev:
+      type: trino
+      method: none
+      host: trino.data-platform.svc.cluster.local
+      port: 8080
+      catalog: nessie
+      schema: gold
+      threads: 4
+      http_scheme: http
+      session_properties:
+        iceberg.target-file-size-bytes: "134217728"
+        iceberg.compression-codec: "SNAPPY"
+
+    prod:
+      type: trino
+      method: none
+      host: trino.data-platform.svc.cluster.local
+      port: 8080
+      catalog: nessie
+      schema: gold
+      threads: 8
+      http_scheme: http
+      session_properties:
+        iceberg.target-file-size-bytes: "268435456"
+        iceberg.compression-codec: "SNAPPY"
