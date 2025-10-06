@@ -36,19 +36,23 @@ class DBTTransformationService:
             "DBT_PROJECT_DIR", "/home/hac/downloads/code/asgard-dev/dbt"
         )
         # Trino configuration for data-platform namespace
-        self.trino_host = os.getenv("TRINO_HOST", "trino-coordinator.data-platform.svc.cluster.local")
+        self.trino_host = os.getenv(
+            "TRINO_HOST", "trino-coordinator.data-platform.svc.cluster.local"
+        )
         self.trino_port = int(os.getenv("TRINO_PORT", "8080"))
         self.trino_user = os.getenv("TRINO_USER", "trino")
-        
+
         # Iceberg catalog configuration
         self.catalog = os.getenv("TRINO_CATALOG", "iceberg")
         self.silver_schema = os.getenv("SILVER_SCHEMA", "silver")
         self.gold_schema = os.getenv("GOLD_SCHEMA", "gold")
-        
+
         # Nessie configuration for data-platform namespace
-        self.nessie_uri = os.getenv("NESSIE_URI", "http://nessie.data-platform.svc.cluster.local:19120/api/v1")
+        self.nessie_uri = os.getenv(
+            "NESSIE_URI", "http://nessie.data-platform.svc.cluster.local:19120/api/v1"
+        )
         self.nessie_ref = os.getenv("NESSIE_REF", "main")
-        
+
         # AWS/S3 configuration (from secrets)
         self.s3_bucket = os.getenv("S3_BUCKET", "asgard-data-lake")
         self.s3_region = os.getenv("AWS_REGION", "us-west-2")
