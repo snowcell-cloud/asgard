@@ -258,6 +258,8 @@ asgard:
       schema: {self.gold_schema}
       threads: 4
       http_scheme: http
+      retries: 5
+      timezone: UTC
       session_properties:
         iceberg.target-file-size-bytes: "268435456"
         iceberg.compression-codec: "SNAPPY"
@@ -287,8 +289,18 @@ asgard:
             original_cwd = os.getcwd()
             os.chdir(self.dbt_project_dir)
 
+            # Run dbt debug first to check connection
+            debug_cmd = ["uv", "run", "dbt", "debug", "--profiles-dir", ".", "--project-dir", "."]
+            debug_result = subprocess.run(
+                debug_cmd, capture_output=True, text=True, timeout=60
+            )
+            
+            print(f"DBT Debug Output:\n{debug_result.stdout}\n{debug_result.stderr}")
+
             # Run dbt command
             cmd = [
+                "uv",
+                "run",
                 "dbt",
                 "run",
                 "--select",
@@ -303,8 +315,14 @@ asgard:
                 cmd, capture_output=True, text=True, timeout=300  # 5 minute timeout
             )
 
+            print(f"DBT Run Output:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}")
+
             if result.returncode != 0:
-                raise Exception(f"dbt run failed: {result.stderr}")
+                # Include full error message
+                error_msg = f"dbt run failed (return code {result.returncode}):\n"
+                error_msg += f"STDOUT:\n{result.stdout}\n"
+                error_msg += f"STDERR:\n{result.stderr}"
+                raise Exception(error_msg)
 
             return {
                 "stdout": result.stdout,
