@@ -30,15 +30,17 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY app/ ./app/
 
+# Create non-root user first
+RUN useradd --create-home --shell /bin/bash app
+
 # Set environment variable to install in system Python
 ENV UV_SYSTEM_PYTHON=1
 
 # Install dependencies with uv sync (production only) as root first
 RUN uv sync --frozen --no-dev
 
-# Create non-root user and change ownership
-RUN useradd --create-home --shell /bin/bash app && \
-    chown -R app:app /app
+# Change ownership of everything including .venv to app user
+RUN chown -R app:app /app
 
 # Switch to app user
 USER app
