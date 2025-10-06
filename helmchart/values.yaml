@@ -68,11 +68,27 @@ autoscaling:
 
 resources:
   limits:
+    cpu: 2000m
+    memory: 2000Mi
+  requests:
     cpu: 1000m
     memory: 1000Mi
-  requests:
-    cpu: 500m
-    memory: 512Mi
+
+# Volume configuration for dbt temp storage
+volumes:
+  - name: temp-storage
+    emptyDir: {}
+
+volumeMounts:
+  - name: temp-storage
+    mountPath: /tmp
+
+# Security context
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  runAsNonRoot: true
 
 nodeSelector: {}
 

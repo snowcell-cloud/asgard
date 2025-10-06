@@ -36,11 +36,16 @@ COPY app/ ./app/
 # Change ownership to app user before installing
 RUN chown -R app:app /app
 
+# Create writable temp directory for dbt projects
+RUN mkdir -p /tmp/dbt_projects && chown app:app /tmp/dbt_projects
+
 # Switch to app user
 USER app
 
-# Set environment variable to install in system Python
+# Set environment variables
 ENV UV_SYSTEM_PYTHON=1
+ENV DBT_PROJECT_DIR=/tmp/dbt_projects
+ENV TMPDIR=/tmp
 
 # Install dependencies with uv sync (production only)
 RUN uv sync --frozen --no-dev

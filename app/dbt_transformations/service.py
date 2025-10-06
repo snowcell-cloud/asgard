@@ -32,9 +32,11 @@ class DBTTransformationService:
 
     def __init__(self):
         """Initialize the service with configuration."""
-        self.dbt_project_dir = os.getenv(
-            "DBT_PROJECT_DIR", "/home/hac/downloads/code/asgard-dev/dbt"
-        )
+        # Use a writable temporary directory for dbt projects in production
+        default_dbt_dir = os.path.join(tempfile.gettempdir(), "dbt_projects")
+        self.dbt_project_dir = os.getenv("DBT_PROJECT_DIR", default_dbt_dir)
+        # Ensure the directory exists
+        os.makedirs(self.dbt_project_dir, exist_ok=True)
         # Trino configuration for data-platform namespace
         self.trino_host = os.getenv(
             "TRINO_HOST", "trino-coordinator.data-platform.svc.cluster.local"
@@ -54,8 +56,8 @@ class DBTTransformationService:
         self.nessie_ref = os.getenv("NESSIE_REF", "main")
 
         # AWS/S3 configuration (from secrets)
-        self.s3_bucket = os.getenv("S3_BUCKET", "asgard-data-lake")
-        self.s3_region = os.getenv("AWS_REGION", "us-west-2")
+        self.s3_bucket = os.getenv("S3_BUCKET", "airbytedestination1")
+        self.s3_region = os.getenv("AWS_REGION", "eu-north-1")
         self.aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
         self.aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
 
@@ -205,8 +207,67 @@ class DBTTransformationService:
             sql_query=request.sql_query,
         )
 
+    def _ensure_dbt_project_structure(self):
+        """Ensure the dbt project structure exists with required files."""
+        project_dir = Path(self.dbt_project_dir)
+        project_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create dbt_project.yml
+        dbt_project_yml = project_dir / "dbt_project.yml"
+        if not dbt_project_yml.exists():
+            dbt_project_content = f"""
+name: 'asgard_transformations'
+version: '1.0.0'
+config-version: 2
+
+profile: 'asgard'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  asgard_transformations:
+    gold:
+      +materialized: table
+      +schema: gold
+"""
+            with open(dbt_project_yml, "w") as f:
+                f.write(dbt_project_content.strip())
+
+        # Create profiles.yml
+        profiles_yml = project_dir / "profiles.yml"
+        if not profiles_yml.exists():
+            profiles_content = f"""
+asgard:
+  target: prod
+  outputs:
+    prod:
+      type: trino
+      method: none
+      host: {self.trino_host}
+      port: {self.trino_port}
+      user: {self.trino_user}
+      catalog: {self.catalog}
+      schema: {self.gold_schema}
+      threads: 1
+"""
+            with open(profiles_yml, "w") as f:
+                f.write(profiles_content.strip())
+
     def _create_model_file(self, model_name: str, model_content: str) -> str:
         """Create a temporary dbt model file."""
+        # Ensure dbt project structure exists
+        self._ensure_dbt_project_structure()
+
         models_dir = Path(self.dbt_project_dir) / "models" / "gold"
         models_dir.mkdir(parents=True, exist_ok=True)
 
