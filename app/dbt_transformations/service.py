@@ -62,6 +62,36 @@ class DBTTransformationService:
         # Storage for transformation metadata (in production, use a database)
         self.transformations: Dict[str, Dict] = {}
 
+    async def _ensure_schemas_exist(self):
+        """Ensure required schemas exist in Trino/Iceberg."""
+        try:
+            from trino.dbapi import connect
+
+            conn = connect(
+                host=self.trino_host,
+                port=self.trino_port,
+                user=self.trino_user,
+                catalog=self.catalog,
+                schema="default",
+                http_scheme="http",
+            )
+
+            cursor = conn.cursor()
+
+            # Check and create gold schema if needed
+            try:
+                cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.catalog}.{self.gold_schema}")
+                print(f"✅ Ensured schema exists: {self.catalog}.{self.gold_schema}")
+            except Exception as e:
+                print(f"⚠️  Could not create gold schema: {e}")
+
+            cursor.close()
+            conn.close()
+
+        except Exception as e:
+            print(f"⚠️  Could not verify schemas: {e}")
+            # Don't fail the transformation, just log the warning
+
     async def create_dynamic_transformation(
         self, request: DBTTransformationRequest
     ) -> DBTTransformationResponse:
@@ -99,6 +129,9 @@ class DBTTransformationService:
             transformation_data["status"] = TransformationStatus.RUNNING
             transformation_data["updated_at"] = datetime.now(timezone.utc)
 
+            # Ensure schemas exist
+            await self._ensure_schemas_exist()
+
             # Create the dbt model
             model_content = self._generate_dbt_model(request)
             model_file_path = self._create_model_file(request.name, model_content)
@@ -129,16 +162,22 @@ class DBTTransformationService:
 
             except Exception as e:
                 # Update status to failed
+                error_str = str(e)
                 transformation_data.update(
                     {
                         "status": TransformationStatus.FAILED,
                         "updated_at": datetime.now(timezone.utc),
-                        "error_message": str(e),
+                        "error_message": error_str,
                     }
                 )
 
+                # Enhance error message for common issues
+                if "Schema" in error_str and "does not exist" in error_str:
+                    error_str += "\n\nℹ️  The schema referenced in your SQL query doesn't exist in the Iceberg catalog."
+                    error_str += f"\n   Please ensure the schema exists or use fully qualified table names like: {self.catalog}.schema_name.table_name"
+
                 raise HTTPException(
-                    status_code=500, detail=f"Transformation execution failed: {str(e)}"
+                    status_code=500, detail=f"Transformation execution failed: {error_str}"
                 )
 
             finally:

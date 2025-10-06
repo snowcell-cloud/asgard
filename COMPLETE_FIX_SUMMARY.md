@@ -3,30 +3,36 @@
 ## Issues Found and Fixed
 
 ### Issue 1: Permission Denied ✅ FIXED
+
 **Error**: `[Errno 13] Permission denied: '/home/hac'`
 
 **Cause**: DBT trying to create files in non-writable directory
 
-**Fix**: 
+**Fix**:
+
 - Changed dbt project directory to `/tmp/dbt_projects`
 - Updated Dockerfile to create writable temp directory
 - Set `DBT_PROJECT_DIR` environment variable
 
 ### Issue 2: Module Not Found ✅ FIXED
+
 **Error**: `dbt run failed: INFO:trino.client:failed after 3 attempts`
 
 **Real Cause**: DBT running outside uv virtual environment, couldn't find `trino` module
 
 **Fix**:
+
 - Changed subprocess calls from `["dbt", "run", ...]` to `["uv", "run", "dbt", "run", ...]`
 - This ensures dbt runs within the uv environment where dependencies are installed
 
-### Issue 3: Invalid Session Properties ✅ FIXED  
+### Issue 3: Invalid Session Properties ✅ FIXED
+
 **Error**: `Session property 'iceberg.target-file-size-bytes' does not exist`
 
 **Cause**: Trino doesn't recognize these Iceberg session properties
 
 **Fix**:
+
 - Removed `session_properties` section from profiles.yml
 - Properties removed:
   - `iceberg.target-file-size-bytes`
@@ -35,6 +41,7 @@
 ## Final Configuration
 
 ### Dockerfile Changes
+
 ```dockerfile
 # Create writable temp directory
 RUN mkdir -p /tmp/dbt_projects && chown app:app /tmp/dbt_projects
@@ -45,11 +52,13 @@ ENV TMPDIR=/tmp
 ```
 
 ### Service Changes (app/dbt_transformations/service.py)
+
 1. **DBT project directory**: Uses temp directory
 2. **Subprocess calls**: Prefixed with `uv run`
 3. **profiles.yml**: Removed invalid session properties
 
 ### Helm Values (helmchart/values.yaml)
+
 ```yaml
 env:
   TRINO_HOST: "trino.data-platform.svc.cluster.local"
@@ -62,11 +71,13 @@ env:
 ## Deployment
 
 ### Quick Deploy (Recommended)
+
 ```bash
 ./quick-deploy-fix.sh
 ```
 
 ### Manual Deploy
+
 ```bash
 # 1. Build
 docker build -t 637423187518.dkr.ecr.eu-north-1.amazonaws.com/asgard:latest .
@@ -89,6 +100,7 @@ kubectl logs -n asgard -l app=asgard-app --tail=50
 ## Testing
 
 ### Test the Transformation API
+
 ```bash
 curl -X POST http://51.89.225.64/dbt/transform \
   -H 'Content-Type: application/json' \
@@ -102,6 +114,7 @@ curl -X POST http://51.89.225.64/dbt/transform \
 ```
 
 ### Expected Response
+
 ```json
 {
   "id": "uuid-here",
@@ -159,6 +172,7 @@ print(cursor.fetchone())
 ## Status: ✅ ALL ISSUES FIXED - READY FOR PRODUCTION
 
 Three issues identified and resolved:
+
 1. ✅ Permission denied - Fixed with writable temp directory
 2. ✅ Module not found - Fixed with `uv run` prefix
 3. ✅ Invalid session properties - Fixed by removing them
