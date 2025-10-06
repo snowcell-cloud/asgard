@@ -260,9 +260,6 @@ asgard:
       http_scheme: http
       retries: 5
       timezone: UTC
-      session_properties:
-        iceberg.target-file-size-bytes: "268435456"
-        iceberg.compression-codec: "SNAPPY"
 """
             with open(profiles_yml, "w") as f:
                 f.write(profiles_content.strip())
@@ -291,10 +288,8 @@ asgard:
 
             # Run dbt debug first to check connection
             debug_cmd = ["uv", "run", "dbt", "debug", "--profiles-dir", ".", "--project-dir", "."]
-            debug_result = subprocess.run(
-                debug_cmd, capture_output=True, text=True, timeout=60
-            )
-            
+            debug_result = subprocess.run(debug_cmd, capture_output=True, text=True, timeout=60)
+
             print(f"DBT Debug Output:\n{debug_result.stdout}\n{debug_result.stderr}")
 
             # Run dbt command

@@ -1,0 +1,35 @@
+# Corrected profiles.yml for Production
+
+asgard_data_products:
+  target: prod
+  outputs:
+    dev:
+      type: trino
+      method: none
+      user: dbt
+      host: trino.data-platform.svc.cluster.local
+      port: 8080
+      catalog: iceberg
+      schema: gold
+      threads: 4
+      http_scheme: http
+      retries: 5
+      timezone: UTC
+
+    prod:
+      type: trino
+      method: none
+      user: dbt
+      host: trino.data-platform.svc.cluster.local
+      port: 8080
+      catalog: iceberg
+      schema: gold
+      threads: 8
+      http_scheme: http
+      retries: 5
+      timezone: UTC
+
+# Note: Session properties removed because they're not supported
+# If you need Iceberg-specific settings, configure them at:
+# 1. Trino catalog level
+# 2. Table level using dbt model config
