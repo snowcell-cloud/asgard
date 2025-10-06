@@ -1,0 +1,8 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic>=1.10,<2.0
+httpx==0.25.2
+dbt-core==1.6.9
+dbt-trino==1.6.2
+kubernetes==28.1.0
+aiofiles==23.2.1

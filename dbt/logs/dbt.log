@@ -1,0 +1,327 @@
+[0m08:48:55.644790 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7c711d7b9890>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7c711dc0b7d0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7c711d7ba710>]}
+
+
+============================== 08:48:55.692641 | d43c206c-a604-4884-a93a-79c85fd45edb ==============================
+[0m08:48:55.692641 [info ] [MainThread]: Running with dbt=1.10.13
+[0m08:48:55.693156 [debug] [MainThread]: running dbt with arguments {'use_colors': 'True', 'fail_fast': 'False', 'send_anonymous_usage_stats': 'True', 'log_path': '/home/hac/downloads/code/asgard-dev/dbt/logs', 'partial_parse': 'True', 'log_format': 'default', 'debug': 'False', 'profiles_dir': '/home/hac/downloads/code/asgard-dev/dbt', 'use_experimental_parser': 'False', 'no_print': 'None', 'target_path': 'None', 'warn_error': 'None', 'invocation_command': 'dbt run --select dp_gold_layer_test_product', 'log_cache_events': 'False', 'empty': 'False', 'write_json': 'True', 'printer_width': '80', 'introspect': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'indirect_selection': 'eager', 'version_check': 'True', 'cache_selected_only': 'False', 'static_parser': 'True', 'quiet': 'False'}
+[0m08:48:55.810621 [error] [MainThread]: Encountered an error:
+Runtime Error
+  Credentials in profile "asgard_data_products", target "dev" invalid: 'user' is a required property
+[0m08:48:55.811959 [debug] [MainThread]: Resource report: {"command_name": "run", "command_success": false, "command_wall_clock_time": 0.22448748, "process_in_blocks": "50408", "process_kernel_time": 0.972454, "process_mem_max_rss": "120600", "process_out_blocks": "30960", "process_user_time": 2.400747}
+[0m08:48:55.812497 [debug] [MainThread]: Command `dbt run` failed at 08:48:55.812404 after 0.23 seconds
+[0m08:48:55.812829 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7c711d7b9310>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7c711d7ef150>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7c711d7ed590>]}
+[0m08:48:55.813181 [debug] [MainThread]: Flushing usage events
+[0m08:48:57.247104 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m09:19:22.768195 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7df061139e10>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7df061138fd0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7df061074e10>]}
+
+
+============================== 09:19:22.772019 | 52b09b2e-e6bb-46d4-b244-f67fb5891478 ==============================
+[0m09:19:22.772019 [info ] [MainThread]: Running with dbt=1.10.13
+[0m09:19:22.772523 [debug] [MainThread]: running dbt with arguments {'target_path': 'None', 'fail_fast': 'False', 'log_cache_events': 'False', 'static_parser': 'True', 'introspect': 'True', 'version_check': 'True', 'partial_parse': 'True', 'send_anonymous_usage_stats': 'True', 'empty': 'False', 'profiles_dir': '/home/hac/downloads/code/asgard-dev/dbt', 'invocation_command': 'dbt run --select dp_api_test_product_2025', 'warn_error': 'None', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'indirect_selection': 'eager', 'quiet': 'False', 'debug': 'False', 'use_colors': 'True', 'log_path': '/home/hac/downloads/code/asgard-dev/dbt/logs', 'use_experimental_parser': 'False', 'write_json': 'True', 'printer_width': '80', 'no_print': 'None', 'cache_selected_only': 'False', 'log_format': 'default'}
+[0m09:19:22.832955 [error] [MainThread]: Encountered an error:
+Runtime Error
+  Credentials in profile "asgard_data_products", target "dev" invalid: 'user' is a required property
+[0m09:19:22.833772 [debug] [MainThread]: Resource report: {"command_name": "run", "command_success": false, "command_wall_clock_time": 0.12105016, "process_in_blocks": "50728", "process_kernel_time": 0.557681, "process_mem_max_rss": "102980", "process_out_blocks": "16", "process_user_time": 1.20116}
+[0m09:19:22.834170 [debug] [MainThread]: Command `dbt run` failed at 09:19:22.834084 after 0.12 seconds
+[0m09:19:22.834721 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7df061143d10>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7df061142350>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7df064e13510>]}
+[0m09:19:22.835071 [debug] [MainThread]: Flushing usage events
+[0m09:19:24.508164 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m09:51:58.957496 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7e3d1fb145d0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7e3d1fb15390>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7e3d1fb17310>]}
+
+
+============================== 09:51:58.962110 | a65776dc-feeb-46a0-b77b-06b12bb21b11 ==============================
+[0m09:51:58.962110 [info ] [MainThread]: Running with dbt=1.10.13
+[0m09:51:58.962628 [debug] [MainThread]: running dbt with arguments {'version_check': 'True', 'static_parser': 'True', 'use_experimental_parser': 'False', 'use_colors': 'True', 'target_path': 'None', 'no_print': 'None', 'profiles_dir': '/home/hac/downloads/code/asgard-dev/dbt', 'send_anonymous_usage_stats': 'True', 'debug': 'False', 'warn_error': 'None', 'log_format': 'default', 'empty': 'False', 'fail_fast': 'False', 'cache_selected_only': 'False', 'log_path': '/home/hac/downloads/code/asgard-dev/dbt/logs', 'introspect': 'True', 'printer_width': '80', 'partial_parse': 'True', 'write_json': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'invocation_command': 'dbt run --select dp_api_test_product_2025', 'log_cache_events': 'False', 'indirect_selection': 'eager', 'quiet': 'False'}
+[0m09:51:59.021556 [error] [MainThread]: Encountered an error:
+Runtime Error
+  Credentials in profile "asgard_data_products", target "dev" invalid: 'user' is a required property
+[0m09:51:59.022410 [debug] [MainThread]: Resource report: {"command_name": "run", "command_success": false, "command_wall_clock_time": 0.119796254, "process_in_blocks": "40456", "process_kernel_time": 0.513388, "process_mem_max_rss": "102636", "process_out_blocks": "8", "process_user_time": 1.197906}
+[0m09:51:59.022810 [debug] [MainThread]: Command `dbt run` failed at 09:51:59.022724 after 0.12 seconds
+[0m09:51:59.023349 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7e3d2382fc10>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7e3d2382fb90>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7e3d1f991ad0>]}
+[0m09:51:59.023725 [debug] [MainThread]: Flushing usage events
+[0m09:52:00.875689 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m10:03:45.695722 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f26790ec710>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f26790ec3d0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f26790ec290>]}
+
+
+============================== 10:03:45.700475 | 8ecffd3a-0efd-4ad8-92b4-60cf2363bc82 ==============================
+[0m10:03:45.700475 [info ] [MainThread]: Running with dbt=1.10.13
+[0m10:03:45.700938 [debug] [MainThread]: running dbt with arguments {'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'no_print': 'None', 'partial_parse': 'True', 'debug': 'False', 'warn_error': 'None', 'empty': 'False', 'profiles_dir': '/home/hac/downloads/code/asgard-dev/dbt', 'indirect_selection': 'eager', 'write_json': 'True', 'log_cache_events': 'False', 'printer_width': '80', 'send_anonymous_usage_stats': 'True', 'target_path': 'None', 'version_check': 'True', 'invocation_command': 'dbt run --select dp_api_test_product_2025', 'quiet': 'False', 'fail_fast': 'False', 'log_format': 'default', 'log_path': '/home/hac/downloads/code/asgard-dev/dbt/logs', 'cache_selected_only': 'False', 'use_colors': 'True', 'static_parser': 'True', 'use_experimental_parser': 'False', 'introspect': 'True'}
+[0m10:03:45.760442 [error] [MainThread]: Encountered an error:
+Runtime Error
+  Credentials in profile "asgard_data_products", target "dev" invalid: 'user' is a required property
+[0m10:03:45.761219 [debug] [MainThread]: Resource report: {"command_name": "run", "command_success": false, "command_wall_clock_time": 0.12037159, "process_in_blocks": "40872", "process_kernel_time": 0.486751, "process_mem_max_rss": "102892", "process_out_blocks": "16", "process_user_time": 1.169073}
+[0m10:03:45.761624 [debug] [MainThread]: Command `dbt run` failed at 10:03:45.761540 after 0.12 seconds
+[0m10:03:45.762129 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f2678f67ad0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f26790e4510>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f2679292590>]}
+[0m10:03:45.762468 [debug] [MainThread]: Flushing usage events
+[0m10:03:51.854357 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m10:20:39.863249 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x738f62af4190>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x738f62ae5150>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x738f62ae4f90>]}
+
+
+============================== 10:20:39.868020 | 82c4cf3b-eb1c-4ed2-863a-6a7fb9ba57f1 ==============================
+[0m10:20:39.868020 [info ] [MainThread]: Running with dbt=1.10.13
+[0m10:20:39.868574 [debug] [MainThread]: running dbt with arguments {'version_check': 'True', 'write_json': 'True', 'invocation_command': 'dbt run --select dp_data_persistence_test_2025', 'fail_fast': 'False', 'log_format': 'default', 'static_parser': 'True', 'indirect_selection': 'eager', 'use_experimental_parser': 'False', 'log_cache_events': 'False', 'log_path': '/home/hac/downloads/code/asgard-dev/dbt/logs', 'send_anonymous_usage_stats': 'True', 'debug': 'False', 'empty': 'False', 'cache_selected_only': 'False', 'warn_error': 'None', 'target_path': 'None', 'partial_parse': 'True', 'use_colors': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'introspect': 'True', 'no_print': 'None', 'quiet': 'False', 'printer_width': '80', 'profiles_dir': '/home/hac/downloads/code/asgard-dev/dbt'}
+[0m10:20:39.929322 [error] [MainThread]: Encountered an error:
+Runtime Error
+  Credentials in profile "asgard_data_products", target "dev" invalid: 'user' is a required property
+[0m10:20:39.930098 [debug] [MainThread]: Resource report: {"command_name": "run", "command_success": false, "command_wall_clock_time": 0.12167761, "process_in_blocks": "63320", "process_kernel_time": 0.558728, "process_mem_max_rss": "102924", "process_out_blocks": "8", "process_user_time": 1.164373}
+[0m10:20:39.930484 [debug] [MainThread]: Command `dbt run` failed at 10:20:39.930401 after 0.12 seconds
+[0m10:20:39.930975 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x738f66813590>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x738f66813350>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x738f62969950>]}
+[0m10:20:39.931343 [debug] [MainThread]: Flushing usage events
+[0m10:20:44.625816 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m10:24:59.041427 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x79c395b50050>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x79c395cf65d0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x79c395b43ed0>]}
+
+
+============================== 10:24:59.045969 | 69c20a43-5ef0-479d-9575-8d1e5fd650a5 ==============================
+[0m10:24:59.045969 [info ] [MainThread]: Running with dbt=1.10.13
+[0m10:24:59.046428 [debug] [MainThread]: running dbt with arguments {'profiles_dir': '/home/hac/downloads/code/asgard-dev/dbt', 'debug': 'False', 'static_parser': 'True', 'warn_error': 'None', 'use_colors': 'True', 'printer_width': '80', 'send_anonymous_usage_stats': 'True', 'invocation_command': 'dbt run --select dp_data_persistence_test_2025', 'log_format': 'default', 'version_check': 'True', 'log_path': '/home/hac/downloads/code/asgard-dev/dbt/logs', 'introspect': 'True', 'indirect_selection': 'eager', 'target_path': 'None', 'partial_parse': 'True', 'fail_fast': 'False', 'log_cache_events': 'False', 'no_print': 'None', 'empty': 'False', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'use_experimental_parser': 'False', 'write_json': 'True', 'quiet': 'False', 'cache_selected_only': 'False'}
+[0m10:24:59.239447 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'project_id', 'label': '69c20a43-5ef0-479d-9575-8d1e5fd650a5', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x79c3957b2950>]}
+[0m10:24:59.304067 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'adapter_info', 'label': '69c20a43-5ef0-479d-9575-8d1e5fd650a5', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x79c3985cc090>]}
+[0m10:24:59.304705 [info ] [MainThread]: Registered adapter: trino=1.9.3
+[0m10:24:59.400588 [debug] [MainThread]: checksum: 9f0c81e2574b4ff463f3d16d080df83c6982fc0372c9feeacae0504ac9ea3ffe, vars: {}, profile: , target: , version: 1.10.13
+[0m10:24:59.401121 [info ] [MainThread]: Unable to do partial parsing because saved manifest not found. Starting full parse.
+[0m10:24:59.401470 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'partial_parser', 'label': '69c20a43-5ef0-479d-9575-8d1e5fd650a5', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x79c39562e290>]}
+[0m10:25:00.154329 [error] [MainThread]: Encountered an error:
+Parsing Error
+  at path ['meta']: Undefined is not of type 'string'
+[0m10:25:00.155184 [debug] [MainThread]: Resource report: {"command_name": "run", "command_success": false, "command_wall_clock_time": 1.169409, "process_in_blocks": "69696", "process_kernel_time": 0.611258, "process_mem_max_rss": "114976", "process_out_blocks": "8", "process_user_time": 2.192558}
+[0m10:25:00.155588 [debug] [MainThread]: Command `dbt run` failed at 10:25:00.155508 after 1.17 seconds
+[0m10:25:00.155907 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x79c395989c10>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x79c395b41dd0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x79c395cf6690>]}
+[0m10:25:00.156237 [debug] [MainThread]: Flushing usage events
+[0m10:25:01.874723 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m10:25:12.964743 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f0a9e4eeed0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f0a9e4efa10>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f0a9e4ed290>]}
+
+
+============================== 10:25:12.967234 | 7225d311-59bf-465b-8c53-36510bd09a0a ==============================
+[0m10:25:12.967234 [info ] [MainThread]: Running with dbt=1.10.13
+[0m10:25:12.967678 [debug] [MainThread]: running dbt with arguments {'use_experimental_parser': 'False', 'introspect': 'True', 'indirect_selection': 'eager', 'warn_error': 'None', 'target_path': 'None', 'static_parser': 'True', 'profiles_dir': '/home/hac/downloads/code/asgard-dev/dbt', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'log_path': '/home/hac/downloads/code/asgard-dev/dbt/logs', 'quiet': 'False', 'use_colors': 'True', 'log_cache_events': 'False', 'write_json': 'True', 'fail_fast': 'False', 'log_format': 'default', 'cache_selected_only': 'False', 'printer_width': '80', 'partial_parse': 'True', 'debug': 'False', 'version_check': 'True', 'no_print': 'None', 'empty': 'None', 'send_anonymous_usage_stats': 'True', 'invocation_command': 'dbt debug'}
+[0m10:25:12.988994 [info ] [MainThread]: dbt version: 1.10.13
+[0m10:25:12.989455 [info ] [MainThread]: python version: 3.11.13
+[0m10:25:12.989779 [info ] [MainThread]: python path: /home/hac/downloads/code/asgard-dev/.venv/bin/python3
+[0m10:25:12.990113 [info ] [MainThread]: os info: Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39
+[0m10:25:13.038709 [info ] [MainThread]: Using profiles dir at /home/hac/downloads/code/asgard-dev/dbt
+[0m10:25:13.039384 [info ] [MainThread]: Using profiles.yml file at /home/hac/downloads/code/asgard-dev/dbt/profiles.yml
+[0m10:25:13.039840 [info ] [MainThread]: Using dbt_project.yml file at /home/hac/downloads/code/asgard-dev/dbt/dbt_project.yml
+[0m10:25:13.040232 [info ] [MainThread]: adapter type: trino
+[0m10:25:13.040590 [info ] [MainThread]: adapter version: 1.9.3
+[0m10:25:13.140650 [info ] [MainThread]: Configuration:
+[0m10:25:13.141120 [info ] [MainThread]:   profiles.yml file [[32mOK found and valid[0m]
+[0m10:25:13.141492 [info ] [MainThread]:   dbt_project.yml file [[32mOK found and valid[0m]
+[0m10:25:13.141803 [info ] [MainThread]: Required dependencies:
+[0m10:25:13.142151 [debug] [MainThread]: Executing "git --help"
+[0m10:25:13.146064 [debug] [MainThread]: STDOUT: "b"usage: git [-v | --version] [-h | --help] [-C <path>] [-c <name>=<value>]\n           [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]\n           [-p | --paginate | -P | --no-pager] [--no-replace-objects] [--bare]\n           [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]\n           [--config-env=<name>=<envvar>] <command> [<args>]\n\nThese are common Git commands used in various situations:\n\nstart a working area (see also: git help tutorial)\n   clone     Clone a repository into a new directory\n   init      Create an empty Git repository or reinitialize an existing one\n\nwork on the current change (see also: git help everyday)\n   add       Add file contents to the index\n   mv        Move or rename a file, a directory, or a symlink\n   restore   Restore working tree files\n   rm        Remove files from the working tree and from the index\n\nexamine the history and state (see also: git help revisions)\n   bisect    Use binary search to find the commit that introduced a bug\n   diff      Show changes between commits, commit and working tree, etc\n   grep      Print lines matching a pattern\n   log       Show commit logs\n   show      Show various types of objects\n   status    Show the working tree status\n\ngrow, mark and tweak your common history\n   branch    List, create, or delete branches\n   commit    Record changes to the repository\n   merge     Join two or more development histories together\n   rebase    Reapply commits on top of another base tip\n   reset     Reset current HEAD to the specified state\n   switch    Switch branches\n   tag       Create, list, delete or verify a tag object signed with GPG\n\ncollaborate (see also: git help workflows)\n   fetch     Download objects and refs from another repository\n   pull      Fetch from and integrate with another repository or a local branch\n   push      Update remote refs along with associated objects\n\n'git help -a' and 'git help -g' list available subcommands and some\nconcept guides. See 'git help <command>' or 'git help <concept>'\nto read about a specific subcommand or concept.\nSee 'git help git' for an overview of the system.\n""
+[0m10:25:13.146499 [debug] [MainThread]: STDERR: "b''"
+[0m10:25:13.146790 [info ] [MainThread]:  - git [[32mOK found[0m]
+
+[0m10:25:13.147085 [info ] [MainThread]: Connection:
+[0m10:25:13.147443 [info ] [MainThread]:   host: trino.data-platform.svc.cluster.local
+[0m10:25:13.147737 [info ] [MainThread]:   port: 8080
+[0m10:25:13.148018 [info ] [MainThread]:   user: dbt
+[0m10:25:13.148293 [info ] [MainThread]:   database: iceberg
+[0m10:25:13.148566 [info ] [MainThread]:   schema: gold
+[0m10:25:13.148841 [info ] [MainThread]:   cert: None
+[0m10:25:13.149116 [info ] [MainThread]:   prepared_statements_enabled: True
+[0m10:25:13.149530 [info ] [MainThread]: Registered adapter: trino=1.9.3
+[0m10:25:13.233429 [debug] [MainThread]: Acquiring new trino connection 'debug'
+[0m10:25:13.278410 [debug] [MainThread]: Using trino connection "debug"
+[0m10:25:13.278796 [debug] [MainThread]: On debug: select 1 as id
+[0m10:25:13.279056 [debug] [MainThread]: Opening a new connection, currently in state init
+[0m10:25:13.279293 [warn ] [MainThread]: [[33mWARNING[0m]: SSL certificate validation is disabled by default. It is legacy behavior which will be changed in future releases. It is strongly advised to enable `require_certificate_validation` flag or explicitly set `cert` configuration to `True` for security reasons. You may receive an error after that if your SSL setup is incorrect.
+You may opt into the new behavior sooner by setting `flags.require_certificate_validation` to `True` in `dbt_project.yml`.
+Visit https://docs.getdbt.com/reference/global-configs/behavior-changes for more information.
+[0m10:25:13.279768 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'BehaviorChangeEvent', 'label': '7225d311-59bf-465b-8c53-36510bd09a0a', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f0a9dcc0ad0>]}
+[0m10:25:14.073296 [debug] [MainThread]: Trino adapter: Trino error: failed to execute: HTTPConnectionPool(host='trino.data-platform.svc.cluster.local', port=8080): Max retries exceeded with url: /v1/statement (Caused by NameResolutionError("<urllib3.connection.HTTPConnection object at 0x7f0a9dc92a50>: Failed to resolve 'trino.data-platform.svc.cluster.local' ([Errno -2] Name or service not known)"))
+[0m10:25:14.073878 [debug] [MainThread]: On debug: Close
+[0m10:25:14.074237 [info ] [MainThread]:   Connection test: [[31mERROR[0m]
+
+[0m10:25:14.074561 [info ] [MainThread]: [31m1 check failed:[0m
+[0m10:25:14.074851 [info ] [MainThread]: dbt was unable to connect to the specified database.
+The database returned the following error:
+
+  >Database Error
+  failed to execute: HTTPConnectionPool(host='trino.data-platform.svc.cluster.local', port=8080): Max retries exceeded with url: /v1/statement (Caused by NameResolutionError("<urllib3.connection.HTTPConnection object at 0x7f0a9dc92a50>: Failed to resolve 'trino.data-platform.svc.cluster.local' ([Errno -2] Name or service not known)"))
+
+Check your database credentials and try again. For more information, visit:
+https://docs.getdbt.com/docs/configure-your-profile
+
+
+[0m10:25:14.075403 [debug] [MainThread]: Resource report: {"command_name": "debug", "command_success": false, "command_wall_clock_time": 1.1626937, "process_in_blocks": "4896", "process_kernel_time": 0.502205, "process_mem_max_rss": "114824", "process_out_blocks": "624", "process_user_time": 1.35377}
+[0m10:25:14.075754 [debug] [MainThread]: Command `dbt debug` failed at 10:25:14.075679 after 1.16 seconds
+[0m10:25:14.076025 [debug] [MainThread]: Connection 'debug' was properly closed.
+[0m10:25:14.076342 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f0a9e36b8d0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f0a9dc9bb10>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7f0aa2212b50>]}
+[0m10:25:14.076690 [debug] [MainThread]: Flushing usage events
+[0m10:25:15.363116 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m10:25:39.335951 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x78ce4a411350>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x78ce4a410f90>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x78ce4a411790>]}
+
+
+============================== 10:25:39.338722 | 8ec36ca5-4d56-4e40-801a-92feaf874667 ==============================
+[0m10:25:39.338722 [info ] [MainThread]: Running with dbt=1.10.13
+[0m10:25:39.339173 [debug] [MainThread]: running dbt with arguments {'indirect_selection': 'eager', 'version_check': 'True', 'use_experimental_parser': 'False', 'profiles_dir': '/home/hac/downloads/code/asgard-dev/dbt', 'fail_fast': 'False', 'no_print': 'None', 'send_anonymous_usage_stats': 'True', 'introspect': 'True', 'debug': 'False', 'partial_parse': 'True', 'quiet': 'False', 'printer_width': '80', 'use_colors': 'True', 'target_path': 'None', 'warn_error': 'None', 'empty': 'None', 'log_path': '/home/hac/downloads/code/asgard-dev/dbt/logs', 'log_cache_events': 'False', 'static_parser': 'True', 'invocation_command': 'dbt debug', 'log_format': 'default', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'cache_selected_only': 'False', 'write_json': 'True'}
+[0m10:25:39.345540 [info ] [MainThread]: dbt version: 1.10.13
+[0m10:25:39.345950 [info ] [MainThread]: python version: 3.11.13
+[0m10:25:39.346264 [info ] [MainThread]: python path: /home/hac/downloads/code/asgard-dev/.venv/bin/python3
+[0m10:25:39.346561 [info ] [MainThread]: os info: Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39
+[0m10:25:39.397079 [info ] [MainThread]: Using profiles dir at /home/hac/downloads/code/asgard-dev/dbt
+[0m10:25:39.397547 [info ] [MainThread]: Using profiles.yml file at /home/hac/downloads/code/asgard-dev/dbt/profiles.yml
+[0m10:25:39.397876 [info ] [MainThread]: Using dbt_project.yml file at /home/hac/downloads/code/asgard-dev/dbt/dbt_project.yml
+[0m10:25:39.398174 [info ] [MainThread]: adapter type: trino
+[0m10:25:39.398479 [info ] [MainThread]: adapter version: 1.9.3
+[0m10:25:39.497196 [info ] [MainThread]: Configuration:
+[0m10:25:39.497654 [info ] [MainThread]:   profiles.yml file [[32mOK found and valid[0m]
+[0m10:25:39.497975 [info ] [MainThread]:   dbt_project.yml file [[32mOK found and valid[0m]
+[0m10:25:39.498280 [info ] [MainThread]: Required dependencies:
+[0m10:25:39.498591 [debug] [MainThread]: Executing "git --help"
+[0m10:25:39.500975 [debug] [MainThread]: STDOUT: "b"usage: git [-v | --version] [-h | --help] [-C <path>] [-c <name>=<value>]\n           [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]\n           [-p | --paginate | -P | --no-pager] [--no-replace-objects] [--bare]\n           [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]\n           [--config-env=<name>=<envvar>] <command> [<args>]\n\nThese are common Git commands used in various situations:\n\nstart a working area (see also: git help tutorial)\n   clone     Clone a repository into a new directory\n   init      Create an empty Git repository or reinitialize an existing one\n\nwork on the current change (see also: git help everyday)\n   add       Add file contents to the index\n   mv        Move or rename a file, a directory, or a symlink\n   restore   Restore working tree files\n   rm        Remove files from the working tree and from the index\n\nexamine the history and state (see also: git help revisions)\n   bisect    Use binary search to find the commit that introduced a bug\n   diff      Show changes between commits, commit and working tree, etc\n   grep      Print lines matching a pattern\n   log       Show commit logs\n   show      Show various types of objects\n   status    Show the working tree status\n\ngrow, mark and tweak your common history\n   branch    List, create, or delete branches\n   commit    Record changes to the repository\n   merge     Join two or more development histories together\n   rebase    Reapply commits on top of another base tip\n   reset     Reset current HEAD to the specified state\n   switch    Switch branches\n   tag       Create, list, delete or verify a tag object signed with GPG\n\ncollaborate (see also: git help workflows)\n   fetch     Download objects and refs from another repository\n   pull      Fetch from and integrate with another repository or a local branch\n   push      Update remote refs along with associated objects\n\n'git help -a' and 'git help -g' list available subcommands and some\nconcept guides. See 'git help <command>' or 'git help <concept>'\nto read about a specific subcommand or concept.\nSee 'git help git' for an overview of the system.\n""
+[0m10:25:39.501358 [debug] [MainThread]: STDERR: "b''"
+[0m10:25:39.501623 [info ] [MainThread]:  - git [[32mOK found[0m]
+
+[0m10:25:39.501974 [info ] [MainThread]: Connection:
+[0m10:25:39.502283 [info ] [MainThread]:   host: localhost
+[0m10:25:39.502594 [info ] [MainThread]:   port: 8081
+[0m10:25:39.502875 [info ] [MainThread]:   user: dbt
+[0m10:25:39.503153 [info ] [MainThread]:   database: iceberg
+[0m10:25:39.503434 [info ] [MainThread]:   schema: gold
+[0m10:25:39.503713 [info ] [MainThread]:   cert: None
+[0m10:25:39.503993 [info ] [MainThread]:   prepared_statements_enabled: True
+[0m10:25:39.504460 [info ] [MainThread]: Registered adapter: trino=1.9.3
+[0m10:25:39.589634 [debug] [MainThread]: Acquiring new trino connection 'debug'
+[0m10:25:39.615164 [debug] [MainThread]: Using trino connection "debug"
+[0m10:25:39.615536 [debug] [MainThread]: On debug: select 1 as id
+[0m10:25:39.615792 [debug] [MainThread]: Opening a new connection, currently in state init
+[0m10:25:39.616091 [warn ] [MainThread]: [[33mWARNING[0m]: SSL certificate validation is disabled by default. It is legacy behavior which will be changed in future releases. It is strongly advised to enable `require_certificate_validation` flag or explicitly set `cert` configuration to `True` for security reasons. You may receive an error after that if your SSL setup is incorrect.
+You may opt into the new behavior sooner by setting `flags.require_certificate_validation` to `True` in `dbt_project.yml`.
+Visit https://docs.getdbt.com/reference/global-configs/behavior-changes for more information.
+[0m10:25:39.616527 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'BehaviorChangeEvent', 'label': '8ec36ca5-4d56-4e40-801a-92feaf874667', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x78ce49b9cc50>]}
+[0m10:25:40.891096 [debug] [MainThread]: Trino adapter: Trino query id: 20251001_102541_00008_yb5wr
+[0m10:25:40.891493 [debug] [MainThread]: Trino adapter: Trino error: TrinoUserError(type=USER_ERROR, name=INVALID_SESSION_PROPERTY, message="Session property 'iceberg.target-file-size-bytes' does not exist", query_id=20251001_102541_00008_yb5wr)
+[0m10:25:40.891815 [debug] [MainThread]: On debug: Close
+[0m10:25:40.892245 [info ] [MainThread]:   Connection test: [[31mERROR[0m]
+
+[0m10:25:40.892561 [info ] [MainThread]: [31m1 check failed:[0m
+[0m10:25:40.892860 [info ] [MainThread]: dbt was unable to connect to the specified database.
+The database returned the following error:
+
+  >Database Error
+  TrinoUserError(type=USER_ERROR, name=INVALID_SESSION_PROPERTY, message="Session property 'iceberg.target-file-size-bytes' does not exist", query_id=20251001_102541_00008_yb5wr)
+
+Check your database credentials and try again. For more information, visit:
+https://docs.getdbt.com/docs/configure-your-profile
+
+
+[0m10:25:40.893563 [debug] [MainThread]: Resource report: {"command_name": "debug", "command_success": false, "command_wall_clock_time": 1.61173, "process_in_blocks": "56", "process_kernel_time": 0.535009, "process_mem_max_rss": "112252", "process_out_blocks": "24", "process_user_time": 1.335348}
+[0m10:25:40.894006 [debug] [MainThread]: Command `dbt debug` failed at 10:25:40.893904 after 1.61 seconds
+[0m10:25:40.894308 [debug] [MainThread]: Connection 'debug' was properly closed.
+[0m10:25:40.894599 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x78ce4a408410>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x78ce4a287b50>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x78ce4b449050>]}
+[0m10:25:40.894937 [debug] [MainThread]: Flushing usage events
+[0m10:25:42.478308 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m14:06:34.040546 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7335d2c9fad0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7335d2c9fdd0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7335d2c9e810>]}
+
+
+============================== 14:06:34.045463 | f8fea98a-6e34-4068-8fa7-c4a42b471f83 ==============================
+[0m14:06:34.045463 [info ] [MainThread]: Running with dbt=1.10.13
+[0m14:06:34.046122 [debug] [MainThread]: running dbt with arguments {'log_cache_events': 'False', 'target_path': 'None', 'invocation_command': 'dbt debug', 'fail_fast': 'False', 'empty': 'None', 'introspect': 'True', 'profiles_dir': '/home/hac/downloads/code/asgard-dev/dbt', 'quiet': 'False', 'use_colors': 'True', 'no_print': 'None', 'indirect_selection': 'eager', 'send_anonymous_usage_stats': 'True', 'cache_selected_only': 'False', 'use_experimental_parser': 'False', 'static_parser': 'True', 'printer_width': '80', 'debug': 'False', 'version_check': 'True', 'log_format': 'default', 'write_json': 'True', 'warn_error': 'None', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'partial_parse': 'True', 'log_path': '/home/hac/downloads/code/asgard-dev/dbt/logs'}
+[0m14:06:34.056652 [info ] [MainThread]: dbt version: 1.10.13
+[0m14:06:34.057215 [info ] [MainThread]: python version: 3.11.13
+[0m14:06:34.057679 [info ] [MainThread]: python path: /home/hac/downloads/code/asgard-dev/.venv/bin/python3
+[0m14:06:34.058033 [info ] [MainThread]: os info: Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39
+[0m14:06:34.120266 [info ] [MainThread]: Using profiles dir at /home/hac/downloads/code/asgard-dev/dbt
+[0m14:06:34.120875 [info ] [MainThread]: Using profiles.yml file at /home/hac/downloads/code/asgard-dev/dbt/profiles.yml
+[0m14:06:34.121250 [info ] [MainThread]: Using dbt_project.yml file at /home/hac/downloads/code/asgard-dev/dbt/dbt_project.yml
+[0m14:06:34.121646 [info ] [MainThread]: adapter type: trino
+[0m14:06:34.122071 [info ] [MainThread]: adapter version: 1.9.3
+[0m14:06:34.248174 [info ] [MainThread]: Configuration:
+[0m14:06:34.248742 [info ] [MainThread]:   profiles.yml file [[32mOK found and valid[0m]
+[0m14:06:34.249177 [info ] [MainThread]:   dbt_project.yml file [[32mOK found and valid[0m]
+[0m14:06:34.249546 [info ] [MainThread]: Required dependencies:
+[0m14:06:34.249978 [debug] [MainThread]: Executing "git --help"
+[0m14:06:34.253584 [debug] [MainThread]: STDOUT: "b"usage: git [-v | --version] [-h | --help] [-C <path>] [-c <name>=<value>]\n           [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]\n           [-p | --paginate | -P | --no-pager] [--no-replace-objects] [--bare]\n           [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]\n           [--config-env=<name>=<envvar>] <command> [<args>]\n\nThese are common Git commands used in various situations:\n\nstart a working area (see also: git help tutorial)\n   clone     Clone a repository into a new directory\n   init      Create an empty Git repository or reinitialize an existing one\n\nwork on the current change (see also: git help everyday)\n   add       Add file contents to the index\n   mv        Move or rename a file, a directory, or a symlink\n   restore   Restore working tree files\n   rm        Remove files from the working tree and from the index\n\nexamine the history and state (see also: git help revisions)\n   bisect    Use binary search to find the commit that introduced a bug\n   diff      Show changes between commits, commit and working tree, etc\n   grep      Print lines matching a pattern\n   log       Show commit logs\n   show      Show various types of objects\n   status    Show the working tree status\n\ngrow, mark and tweak your common history\n   branch    List, create, or delete branches\n   commit    Record changes to the repository\n   merge     Join two or more development histories together\n   rebase    Reapply commits on top of another base tip\n   reset     Reset current HEAD to the specified state\n   switch    Switch branches\n   tag       Create, list, delete or verify a tag object signed with GPG\n\ncollaborate (see also: git help workflows)\n   fetch     Download objects and refs from another repository\n   pull      Fetch from and integrate with another repository or a local branch\n   push      Update remote refs along with associated objects\n\n'git help -a' and 'git help -g' list available subcommands and some\nconcept guides. See 'git help <command>' or 'git help <concept>'\nto read about a specific subcommand or concept.\nSee 'git help git' for an overview of the system.\n""
+[0m14:06:34.254362 [debug] [MainThread]: STDERR: "b''"
+[0m14:06:34.254828 [info ] [MainThread]:  - git [[32mOK found[0m]
+
+[0m14:06:34.255207 [info ] [MainThread]: Connection:
+[0m14:06:34.255680 [info ] [MainThread]:   host: localhost
+[0m14:06:34.256081 [info ] [MainThread]:   port: 8081
+[0m14:06:34.256461 [info ] [MainThread]:   user: dbt
+[0m14:06:34.256854 [info ] [MainThread]:   database: iceberg
+[0m14:06:34.257218 [info ] [MainThread]:   schema: gold
+[0m14:06:34.257608 [info ] [MainThread]:   cert: None
+[0m14:06:34.258023 [info ] [MainThread]:   prepared_statements_enabled: True
+[0m14:06:34.258617 [info ] [MainThread]: Registered adapter: trino=1.9.3
+[0m14:06:34.360298 [debug] [MainThread]: Acquiring new trino connection 'debug'
+[0m14:06:34.397373 [debug] [MainThread]: Using trino connection "debug"
+[0m14:06:34.397902 [debug] [MainThread]: On debug: select 1 as id
+[0m14:06:34.398249 [debug] [MainThread]: Opening a new connection, currently in state init
+[0m14:06:34.398587 [warn ] [MainThread]: [[33mWARNING[0m]: SSL certificate validation is disabled by default. It is legacy behavior which will be changed in future releases. It is strongly advised to enable `require_certificate_validation` flag or explicitly set `cert` configuration to `True` for security reasons. You may receive an error after that if your SSL setup is incorrect.
+You may opt into the new behavior sooner by setting `flags.require_certificate_validation` to `True` in `dbt_project.yml`.
+Visit https://docs.getdbt.com/reference/global-configs/behavior-changes for more information.
+[0m14:06:34.399161 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'BehaviorChangeEvent', 'label': 'f8fea98a-6e34-4068-8fa7-c4a42b471f83', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7335d2964290>]}
+[0m14:08:05.218197 [debug] [MainThread]: Trino adapter: Trino error: failed to execute: HTTPConnectionPool(host='localhost', port=8081): Read timed out. (read timeout=30.0)
+[0m14:08:05.220209 [debug] [MainThread]: On debug: Close
+[0m14:08:05.220810 [info ] [MainThread]:   Connection test: [[31mERROR[0m]
+
+[0m14:08:05.221260 [info ] [MainThread]: [31m1 check failed:[0m
+[0m14:08:05.221653 [info ] [MainThread]: dbt was unable to connect to the specified database.
+The database returned the following error:
+
+  >Database Error
+  failed to execute: HTTPConnectionPool(host='localhost', port=8081): Read timed out. (read timeout=30.0)
+
+Check your database credentials and try again. For more information, visit:
+https://docs.getdbt.com/docs/configure-your-profile
+
+
+[0m14:08:05.222622 [debug] [MainThread]: Resource report: {"command_name": "debug", "command_success": false, "command_wall_clock_time": 91.26644, "process_in_blocks": "6440", "process_kernel_time": 0.712054, "process_mem_max_rss": "112364", "process_out_blocks": "32", "process_user_time": 1.769845}
+[0m14:08:05.223113 [debug] [MainThread]: Command `dbt debug` failed at 14:08:05.222972 after 91.27 seconds
+[0m14:08:05.223480 [debug] [MainThread]: Connection 'debug' was properly closed.
+[0m14:08:05.223884 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7335d2e29890>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7335d2ca61d0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7335d6a9bc50>]}
+[0m14:08:05.224310 [debug] [MainThread]: Flushing usage events
+[0m14:08:30.639287 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m12:09:09.701972 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x77433fa61650>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x774340991690>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x77433fa9bdd0>]}
+
+
+============================== 12:09:09.707200 | 40d718bf-c983-4476-8123-1416190aa6cd ==============================
+[0m12:09:09.707200 [info ] [MainThread]: Running with dbt=1.10.13
+[0m12:09:09.707704 [debug] [MainThread]: running dbt with arguments {'introspect': 'True', 'cache_selected_only': 'False', 'send_anonymous_usage_stats': 'True', 'debug': 'False', 'log_format': 'default', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'partial_parse': 'True', 'indirect_selection': 'eager', 'static_parser': 'True', 'write_json': 'True', 'log_path': '/home/hac/downloads/code/asgard-dev/dbt/logs', 'fail_fast': 'False', 'warn_error': 'None', 'use_experimental_parser': 'False', 'version_check': 'True', 'log_cache_events': 'False', 'empty': 'False', 'target_path': 'None', 'use_colors': 'True', 'invocation_command': 'dbt run --select dp_customer_analytics_gold', 'no_print': 'None', 'profiles_dir': '/home/hac/downloads/code/asgard-dev/dbt', 'printer_width': '80', 'quiet': 'False'}
+[0m12:09:09.905519 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'project_id', 'label': '40d718bf-c983-4476-8123-1416190aa6cd', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x77434242add0>]}
+[0m12:09:09.971432 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'adapter_info', 'label': '40d718bf-c983-4476-8123-1416190aa6cd', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7743426c8a90>]}
+[0m12:09:09.972197 [info ] [MainThread]: Registered adapter: trino=1.9.3
+[0m12:09:10.070988 [debug] [MainThread]: checksum: 9f0c81e2574b4ff463f3d16d080df83c6982fc0372c9feeacae0504ac9ea3ffe, vars: {}, profile: , target: , version: 1.10.13
+[0m12:09:10.071547 [info ] [MainThread]: Unable to do partial parsing because saved manifest not found. Starting full parse.
+[0m12:09:10.071920 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'partial_parser', 'label': '40d718bf-c983-4476-8123-1416190aa6cd', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x77433fabba50>]}
+[0m12:09:10.850633 [error] [MainThread]: Encountered an error:
+Parsing Error
+  at path ['meta']: Undefined is not of type 'string'
+[0m12:09:10.851536 [debug] [MainThread]: Resource report: {"command_name": "run", "command_success": false, "command_wall_clock_time": 1.2091876, "process_in_blocks": "67976", "process_kernel_time": 0.710253, "process_mem_max_rss": "114720", "process_out_blocks": "16", "process_user_time": 2.060128}
+[0m12:09:10.852051 [debug] [MainThread]: Command `dbt run` failed at 12:09:10.851932 after 1.21 seconds
+[0m12:09:10.852460 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x77433fa9acd0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7743438bbcd0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x77433fc50590>]}
+[0m12:09:10.852855 [debug] [MainThread]: Flushing usage events
+[0m12:09:14.521367 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m04:51:48.272055 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x76cc15e0d150>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x76cc15e0f510>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x76cc15e0cd90>]}
+
+
+============================== 04:51:48.277428 | 54948673-894f-49c3-bf21-268f83615eed ==============================
+[0m04:51:48.277428 [info ] [MainThread]: Running with dbt=1.10.13
+[0m04:51:48.277991 [debug] [MainThread]: running dbt with arguments {'log_format': 'default', 'quiet': 'False', 'target_path': 'None', 'static_parser': 'True', 'fail_fast': 'False', 'use_colors': 'True', 'cache_selected_only': 'False', 'debug': 'False', 'use_experimental_parser': 'False', 'log_cache_events': 'False', 'partial_parse': 'True', 'version_check': 'True', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'empty': 'False', 'printer_width': '80', 'warn_error': 'None', 'profiles_dir': '.', 'invocation_command': 'dbt run --select test_customer_summary --profiles-dir . --project-dir .', 'no_print': 'None', 'send_anonymous_usage_stats': 'True', 'log_path': 'logs', 'write_json': 'True', 'introspect': 'True', 'indirect_selection': 'eager'}
+[0m04:51:48.386721 [error] [MainThread]: Encountered an error:
+Compilation Error
+  Could not render {{ var('data_product_owner') }}: Required var 'data_product_owner' not found in config:
+  Vars supplied to <Configuration> = {}
+[0m04:51:48.387534 [debug] [MainThread]: Resource report: {"command_name": "run", "command_success": false, "command_wall_clock_time": 0.1770676, "process_in_blocks": "68056", "process_kernel_time": 0.520967, "process_mem_max_rss": "103752", "process_out_blocks": "24", "process_user_time": 1.357673}
+[0m04:51:48.388038 [debug] [MainThread]: Command `dbt run` failed at 04:51:48.387922 after 0.18 seconds
+[0m04:51:48.388375 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x76cc15e06d10>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x76cc15e06250>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x76cc19b0fd10>]}
+[0m04:51:48.388756 [debug] [MainThread]: Flushing usage events
+[0m04:51:51.824263 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m05:56:36.623432 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7b4f7de09e90>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7b4f7de09fd0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7b4f7dc774d0>]}
+
+
+============================== 05:56:36.628906 | c6a305e6-725e-4de6-8ec6-43d5ea323649 ==============================
+[0m05:56:36.628906 [info ] [MainThread]: Running with dbt=1.10.13
+[0m05:56:36.629581 [debug] [MainThread]: running dbt with arguments {'target_path': 'None', 'indirect_selection': 'eager', 'static_parser': 'True', 'version_check': 'True', 'introspect': 'True', 'invocation_command': 'dbt run --select JQgkctTiyDsAkwryrvr9el8ASLRJydTtqy0SeRyyo8m2Oxh7tAvjX7ekIViUeLEJsBAA --profiles-dir . --project-dir .', 'use_colors': 'True', 'partial_parse': 'True', 'cache_selected_only': 'False', 'empty': 'False', 'profiles_dir': '.', 'log_format': 'default', 'use_experimental_parser': 'False', 'log_path': 'logs', 'log_cache_events': 'False', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'send_anonymous_usage_stats': 'True', 'fail_fast': 'False', 'no_print': 'None', 'warn_error': 'None', 'printer_width': '80', 'quiet': 'False', 'debug': 'False', 'write_json': 'True'}
+[0m05:56:36.721887 [error] [MainThread]: Encountered an error:
+Compilation Error
+  Could not render {{ var('data_product_owner') }}: Required var 'data_product_owner' not found in config:
+  Vars supplied to <Configuration> = {}
+[0m05:56:36.722690 [debug] [MainThread]: Resource report: {"command_name": "run", "command_success": false, "command_wall_clock_time": 0.16071224, "process_in_blocks": "39584", "process_kernel_time": 0.472388, "process_mem_max_rss": "104032", "process_out_blocks": "16", "process_user_time": 1.312191}
+[0m05:56:36.723195 [debug] [MainThread]: Command `dbt run` failed at 05:56:36.723077 after 0.16 seconds
+[0m05:56:36.723597 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7b4f7ddfa150>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7b4f7dbe6b10>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x7b4f81b17650>]}
+[0m05:56:36.723990 [debug] [MainThread]: Flushing usage events
+[0m05:56:38.566259 [debug] [MainThread]: An error was encountered while trying to flush usage events

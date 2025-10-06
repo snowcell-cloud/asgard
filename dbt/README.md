@@ -1,103 +1,102 @@
-# Asgard Data Products
+# Asgard Data Products - dbt Project
 
-This directory contains the dbt project for creating curated, governed, and reusable data products on top of your Trino/Nessie/Iceberg infrastructure.
+[![dbt CI/CD Pipeline](https://github.com/snowcell-cloud/asgard-dev/actions/workflows/dbt-ci-cd.yml/badge.svg)](https://github.com/snowcell-cloud/asgard-dev/actions/workflows/dbt-ci-cd.yml)
 
-## Overview
+A modern data transformation pipeline built with dbt, creating curated data products on top of Trino/Nessie/Iceberg infrastructure.
 
-Data products are curated datasets that transform raw silver layer data into business-ready analytical assets. Each data product includes:
+## 🎯 Overview
 
-- **Metadata** (owner, consumers, update frequency)
-- **Data lineage** tracking from source to consumption
-- **Quality checks** and validation tests
-- **API access** for programmatic consumption
-- **Automated refresh** capabilities
+This dbt project transforms raw silver layer data into business-ready data products stored in the gold layer. Each data product is designed for specific business use cases with built-in data quality, governance, and documentation.
 
-## Project Structure
+### Data Architecture
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Silver Layer  │───▶│   dbt Models    │───▶│   Gold Layer    │
+│   (Raw Data)    │    │ (Transformations)│    │ (Data Products) │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+       │                        │                        │
+       │                        │                        │
+    Airbyte               dbt Transformations        Business Apps
+   Raw Sources            Quality & Governance        Analytics & ML
+```
+
+## 🏗️ Project Structure
 
 ```
 dbt/
-├── dbt_project.yml          # Project configuration
-├── profiles.yml             # Trino connection settings
+├── dbt_project.yml              # Project configuration
+├── profiles_template.yml        # Connection profiles template
+├── packages.yml                 # dbt package dependencies
 ├── models/
-│   ├── staging/             # Source data standardization
-│   ├── intermediate/        # Business logic transformations
-│   ├── data_products/       # Final curated data products
-│   └── metrics/             # Aggregated metrics
-├── tests/                   # Data quality tests
-├── macros/                  # Reusable SQL functions
-└── README.md               # This file
+│   ├── sources.yml             # Source data definitions
+│   ├── schema_clean.yml        # Model documentation & tests
+│   ├── staging/                # Source data standardization
+│   │   ├── stg_customers_clean.sql
+│   │   ├── stg_orders.sql
+│   │   └── stg_products_clean.sql
+│   ├── intermediate/           # Business logic transformations
+│   │   ├── int_customer_360.sql
+│   │   └── int_product_performance.sql
+│   ├── data_products/          # Final curated data products
+│   │   ├── dp_customer_360_clean.sql
+│   │   └── dp_product_performance_clean.sql
+│   └── metrics/                # Aggregated metrics
+├── tests/                      # Custom data quality tests
+│   ├── assert_data_product_freshness.sql
+│   ├── assert_customer_value_score_logic.sql
+│   └── assert_product_performance_logic.sql
+├── macros/                     # Reusable SQL functions
+│   └── data_product_macros.sql
+├── analyses/                   # Ad-hoc analytical queries
+├── seeds/                      # Static data files
+└── snapshots/                  # SCD Type 2 history tracking
 ```
 
-## Available Data Products
-
-### 1. Customer 360 (`dp_customer_360`)
-
-- **Type**: CUSTOMER_360
-- **Description**: Comprehensive customer view with transaction history and segmentation
-- **Updates**: Daily
-- **Consumers**: Marketing, Customer Success, Analytics teams
-
-### 2. Product Performance (`dp_product_performance`)
-
-- **Type**: PRODUCT_PERFORMANCE
-- **Description**: Product sales metrics and performance analytics
-- **Updates**: Daily
-- **Consumers**: Product, Sales, Analytics teams
-
-### 3. Revenue Analytics (`dp_revenue_analytics`)
-
-- **Type**: REVENUE_ANALYTICS
-- **Description**: Monthly revenue trends and growth analytics
-- **Updates**: Monthly
-- **Consumers**: Finance, Executive, Analytics teams
-
-## Setup and Configuration
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Trino cluster running with Nessie catalog
-- S3/Iceberg warehouse configured
-- dbt-trino adapter installed
-- Python dependencies: `pip install dbt-trino`
+- Python 3.10+
+- Access to Trino cluster
+- dbt-trino adapter
+- AWS credentials (for S3 access)
 
-### Configuration
+### Installation
 
-1. **Update profiles.yml** with your Trino connection details:
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/snowcell-cloud/asgard-dev.git
+   cd asgard-dev/dbt
+   ```
 
-```yaml
-asgard_data_products:
-  target: dev
-  outputs:
-    dev:
-      type: trino
-      host: trino.data-platform.svc.cluster.local
-      port: 8080
-      catalog: nessie
-      schema: gold
-```
+2. **Install dbt and dependencies:**
+   ```bash
+   pip install dbt-trino==1.6.* dbt-utils dbt-expectations
+   dbt deps
+   ```
 
-2. **Configure project variables** in `dbt_project.yml`:
+3. **Configure profiles:**
+   ```bash
+   cp profiles_template.yml ~/.dbt/profiles.yml
+   # Edit with your Trino connection details
+   ```
 
-```yaml
-vars:
-  iceberg_warehouse: "s3a://airbytedestination1/iceberg/"
-  nessie_uri: "http://nessie.data-platform.svc.cluster.local:19120/api/v1"
-  silver_schema: "silver"
-  gold_schema: "gold"
-```
+4. **Test connection:**
+   ```bash
+   dbt debug
+   ```
 
-## Running Data Products
-
-### Using dbt directly:
+### Running the Project
 
 ```bash
-# Run all data products
+# Install dependencies
+dbt deps
+
+# Run all models
 dbt run
 
-# Run specific data product
-dbt run --select dp_customer_360
-
-# Test data quality
+# Run tests
 dbt test
 
 # Generate documentation
@@ -105,99 +104,255 @@ dbt docs generate
 dbt docs serve
 ```
 
-### Using the API:
+## 📊 Data Products
+
+### 1. Customer 360 (`dp_customer_360_clean`)
+
+**Purpose:** Comprehensive customer view with behavioral insights and segmentation.
+
+**Key Features:**
+- Customer lifecycle tracking (prospects → active → at-risk → churned)
+- Value tier classification (high/medium/low/no value)
+- Engagement scoring based on purchase recency
+- Customer value score (0-100 scale)
+
+**Business Use Cases:**
+- Marketing campaign targeting
+- Customer success interventions
+- Sales prioritization
+- Churn prevention
+
+**Schema:**
+```sql
+customer_id              -- Unique customer identifier
+customer_name            -- Full customer name
+email                    -- Customer email address
+customer_segment         -- Lifecycle segment
+value_tier              -- Value classification
+customer_value_score    -- Composite score (0-100)
+engagement_level        -- Engagement classification
+total_orders            -- Number of orders placed
+total_spent             -- Total revenue from customer
+avg_order_value         -- Average order value
+```
+
+### 2. Product Performance (`dp_product_performance_clean`)
+
+**Purpose:** Product analytics with sales performance and lifecycle tracking.
+
+**Key Features:**
+- Sales volume and revenue tier classification
+- Product lifecycle stage tracking
+- Performance scoring (0-100 scale)
+- Revenue per order/customer metrics
+
+**Business Use Cases:**
+- Product portfolio analysis
+- Inventory optimization
+- Pricing strategy
+- Product lifecycle management
+
+**Schema:**
+```sql
+product_id                      -- Unique product identifier
+product_name                    -- Product name
+product_category               -- Product category
+sales_volume_tier             -- Volume classification
+revenue_tier                  -- Revenue classification
+product_performance_score     -- Composite score (0-100)
+product_lifecycle_stage       -- Lifecycle stage
+total_revenue                 -- Total revenue generated
+revenue_per_order            -- Revenue efficiency metric
+```
+
+## 🔍 Data Quality & Testing
+
+### Built-in Tests
+
+- **Uniqueness:** Primary key constraints on all data products
+- **Completeness:** Non-null checks on critical fields
+- **Validity:** Range checks on scores and metrics
+- **Consistency:** Business logic validation
+- **Freshness:** Data recency monitoring
+
+### Custom Tests
+
+- Data product freshness (< 2 days old)
+- Score range validation (0-100)
+- Business logic consistency
+- Cross-model referential integrity
+
+### Running Tests
 
 ```bash
-# Create a new data product
-curl -X POST "http://localhost:8000/api/v1/data-products/" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "My Data Product",
-    "description": "Custom analytics dataset",
-    "data_product_type": "CUSTOM",
-    "source_query": "SELECT * FROM nessie.silver.my_table",
-    "owner": "my-team"
-  }'
+# Run all tests
+dbt test
 
-# Run/refresh a data product
-curl -X POST "http://localhost:8000/api/v1/data-products/{id}/run"
+# Run tests for specific models
+dbt test --select dp_customer_360_clean
 
-# Query data from a data product
-curl "http://localhost:8000/api/v1/data-products/{id}/query?limit=100"
+# Run only freshness tests
+dbt test --select test_type:freshness
 ```
 
-## Best Practices
+## 🔄 CI/CD Pipeline
 
-1. **Naming Conventions**
+### GitHub Actions Workflow
 
-   - Use descriptive names: `dp_customer_churn_prediction`
-   - Include business context: `dp_sales_performance_by_region`
+The project includes a comprehensive CI/CD pipeline with:
 
-2. **Documentation**
+- **Pull Request Validation:**
+  - SQL linting with SQLFluff
+  - dbt compilation checks
+  - Dry run testing
+  - Documentation generation
 
-   - Add clear descriptions to all models
-   - Document column meanings and calculations
-   - Include business logic rationale
+- **Staging Deployment:**
+  - Automated deployment to staging environment
+  - Full test suite execution
+  - Artifact preservation
 
-3. **Testing**
+- **Production Deployment:**
+  - Backup creation before deployment
+  - Production model execution
+  - Documentation deployment to S3
+  - Success notifications
 
-   - Test primary key uniqueness
-   - Validate business rules
-   - Check data freshness
-   - Monitor data quality metrics
+- **Scheduled Runs:**
+  - Daily automated refresh at 6 AM UTC
+  - Data quality monitoring
+  - Failure alerts
 
-4. **Performance**
-   - Use Iceberg table properties for optimization
-   - Implement incremental models for large datasets
-   - Consider partitioning strategies
+### Environment Configuration
 
-## Integration with Existing Infrastructure
+Set the following secrets in GitHub:
 
-This dbt project integrates seamlessly with your existing Asgard platform:
-
-- **Source Data**: Reads from silver layer tables in S3/Iceberg
-- **Transformations**: Uses Trino's SQL capabilities for complex analytics
-- **Storage**: Writes to Iceberg tables for ACID compliance and time travel
-- **Catalog**: Managed through Nessie for branch/merge workflows
-- **API**: Exposed through FastAPI endpoints for programmatic access
-- **Orchestration**: Can be triggered via Spark/K8s jobs or API calls
-
-## Monitoring and Observability
-
-Data products include built-in observability:
-
-- **Lineage tracking**: Source → Transformation → Consumer mapping
-- **Quality metrics**: Null rates, duplicate counts, freshness
-- **Usage analytics**: Query patterns, consumer adoption
-- **Performance monitoring**: Execution times, resource usage
-- **Data drift detection**: Schema and distribution changes
-
-## Extending the Framework
-
-To add new data product types:
-
-1. Create new models in `models/data_products/`
-2. Add corresponding schemas in `models/data_products/schema.yml`
-3. Update API schemas in `app/data_products/schemas.py`
-
-Example new data product:
-
-```sql
--- models/data_products/dp_customer_churn.sql
-{{
-  config(
-    materialized='table',
-    description='Customer churn prediction model results'
-  )
-}}
-
-SELECT
-    customer_id,
-    churn_probability,
-    risk_factors,
-    recommended_actions,
-    model_version,
-    CURRENT_TIMESTAMP as data_product_updated_at
-FROM {{ ref('int_customer_churn_features') }}
-WHERE churn_probability > 0.3
+```bash
+TRINO_HOST=trino.data-platform.svc.cluster.local
+TRINO_PORT=8080
+TRINO_CATALOG=iceberg
+AWS_ACCESS_KEY_ID=your_aws_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret
+AWS_REGION=your_aws_region
+DBT_DOCS_BUCKET=your_s3_bucket
 ```
+
+## 🛠️ Development Workflow
+
+### Adding New Data Products
+
+1. **Create intermediate model** (if needed):
+   ```sql
+   -- models/intermediate/int_new_product.sql
+   {{ config(materialized='view') }}
+   
+   SELECT 
+     -- your transformation logic
+   FROM {{ ref('stg_source_table') }}
+   ```
+
+2. **Create data product model:**
+   ```sql
+   -- models/data_products/dp_new_product.sql
+   {{ config(
+     materialized='table',
+     tags=['data_product', 'your_tag']
+   ) }}
+   
+   SELECT 
+     *,
+     {{ generate_data_product_metadata('dp_new_product', 'CUSTOM') }}
+   FROM {{ ref('int_new_product') }}
+   ```
+
+3. **Add documentation and tests:**
+   ```yaml
+   # models/schema_clean.yml
+   - name: dp_new_product
+     description: "Your data product description"
+     columns:
+       - name: primary_key
+         tests:
+           - not_null
+           - unique
+   ```
+
+4. **Test your changes:**
+   ```bash
+   dbt run --select dp_new_product
+   dbt test --select dp_new_product
+   ```
+
+### Best Practices
+
+- **Naming Conventions:**
+  - `stg_` for staging models
+  - `int_` for intermediate models
+  - `dp_` for data products
+  - `_clean` suffix for cleaned/production versions
+
+- **Model Organization:**
+  - One model per file
+  - Clear dependencies (`ref()` functions)
+  - Consistent column naming
+  - Comprehensive documentation
+
+- **Performance:**
+  - Use appropriate materializations
+  - Leverage Iceberg table properties
+  - Consider partitioning for large datasets
+  - Monitor query performance
+
+## 📈 Monitoring & Observability
+
+### Key Metrics
+
+- Model execution times
+- Test failure rates
+- Data freshness scores
+- Row count trends
+- Data quality scores
+
+### Alerting
+
+- Failed model runs
+- Test failures
+- Data freshness violations
+- Significant row count changes
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/new-data-product`
+3. Make your changes following the development workflow
+4. Run tests: `dbt test`
+5. Submit a pull request
+
+### Code Review Checklist
+
+- [ ] Model follows naming conventions
+- [ ] Documentation is complete
+- [ ] Tests are included
+- [ ] Performance is acceptable
+- [ ] No sensitive data exposure
+
+## 📚 Resources
+
+- [dbt Documentation](https://docs.getdbt.com/)
+- [dbt-trino Adapter](https://github.com/starburstdata/dbt-trino)
+- [Trino Documentation](https://trino.io/docs/)
+- [Iceberg Documentation](https://iceberg.apache.org/docs/)
+
+## 🆘 Support
+
+For questions, issues, or feature requests:
+
+1. Check existing [GitHub Issues](https://github.com/snowcell-cloud/asgard-dev/issues)
+2. Create a new issue with detailed description
+3. Contact the data platform team: `data-platform-team@company.com`
+
+---
+
+**Last Updated:** October 2025  
+**Version:** 1.0.0  
+**Maintainer:** Data Platform Team

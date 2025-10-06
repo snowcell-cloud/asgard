@@ -103,6 +103,118 @@ SELECT * FROM enriched_data"""
 
         return table_name
 
+    async def _create_gold_layer_table(self, data_product: DataProductMetadata, source_query: str) -> bool:
+        """Create Iceberg table in gold layer using direct Trino execution."""
+        try:
+            # Create the final query with enrichment
+            final_query = f"""
+            WITH source_data AS (
+                {source_query}
+            ),
+            enriched_data AS (
+                SELECT 
+                    *,
+                    CURRENT_TIMESTAMP as data_product_updated_at,
+                    '{data_product.owner}' as data_product_owner,
+                    '{data_product.data_product_type.value}' as data_product_type,
+                    '{data_product.id}' as data_product_id
+                FROM source_data
+            )
+            SELECT * FROM enriched_data
+            """
+
+            # Drop existing table if it exists (for rebuild)
+            await self.trino_client.drop_table(data_product.table_name)
+
+            # Create new table with data using simple approach without complex properties
+            create_query = f"""
+            CREATE TABLE {self.trino_client.catalog}.{self.trino_client.schema}.{data_product.table_name} AS
+            {final_query}
+            """
+
+            result = await self.trino_client.execute_query(create_query)
+
+            print(
+                f"✅ Created gold layer table: {self.trino_client.catalog}.{self.trino_client.schema}.{data_product.table_name}"
+            )
+            return True
+
+        except Exception as e:
+            print(f"❌ Failed to create gold layer table: {str(e)}")
+            raise Exception(f"Gold layer table creation failed: {str(e)}")
+
+    async def get_data_product_stats(self, data_product_id: str) -> Dict[str, Any]:
+        """Get statistics about the data product table in gold layer."""
+        registry = self._load_registry()
+
+        if data_product_id not in registry:
+            raise HTTPException(status_code=404, detail="Data product not found")
+
+        data_product = registry[data_product_id]
+
+        if not await self.trino_client.table_exists(data_product.table_name):
+            return {
+                "data_product_id": data_product_id,
+                "status": "table_not_found",
+                "message": "Table not created in gold layer yet. Run the data product first.",
+            }
+
+        try:
+            # Get table statistics
+            stats_query = f"""
+            SELECT 
+                COUNT(*) as row_count,
+                COUNT(DISTINCT data_product_owner) as unique_owners,
+                MIN(data_product_updated_at) as first_update,
+                MAX(data_product_updated_at) as last_update,
+                COUNT(DISTINCT data_product_id) as unique_product_ids
+            FROM {self.trino_client.catalog}.{self.trino_client.schema}.{data_product.table_name}
+            """
+
+            result = await self.trino_client.execute_query(stats_query)
+            data = result.get("data", [[0, 0, None, None, 0]])[0]
+
+            # Get table size information
+            size_query = f"""
+            SELECT 
+                table_name,
+                data_size,
+                file_count,
+                record_count
+            FROM "{self.trino_client.catalog}".information_schema.table_comments
+            WHERE table_schema = '{self.trino_client.schema}' 
+            AND table_name = '{data_product.table_name}'
+            """
+
+            size_result = await self.trino_client.execute_query(size_query)
+            size_data = size_result.get("data", [[None, None, None, None]])[0]
+
+            return {
+                "data_product_id": data_product_id,
+                "table_location": f"{self.trino_client.catalog}.{self.trino_client.schema}.{data_product.table_name}",
+                "gold_layer_stats": {
+                    "row_count": data[0],
+                    "unique_owners": data[1],
+                    "first_update": data[2],
+                    "last_update": data[3],
+                    "unique_product_ids": data[4],
+                },
+                "storage_stats": {
+                    "data_size": size_data[1] if size_data[1] else "unknown",
+                    "file_count": size_data[2] if size_data[2] else "unknown",
+                    "record_count": size_data[3] if size_data[3] else "unknown",
+                },
+                "metadata": {
+                    "created_at": data_product.created_at,
+                    "last_run_at": data_product.last_run_at,
+                    "access_count": data_product.metadata.get("access_count", 0),
+                    "last_accessed": data_product.metadata.get("last_accessed", "never"),
+                },
+            }
+
+        except Exception as e:
+            return {"data_product_id": data_product_id, "error": f"Failed to get stats: {str(e)}"}
+
     async def create_data_product(self, request: DataProductCreateRequest) -> DataProductMetadata:
         """Create a new data product."""
         registry = self._load_registry()
@@ -126,6 +238,7 @@ SELECT * FROM enriched_data"""
             name=request.name,
             description=request.description,
             data_product_type=request.data_product_type,
+            source_query=request.source_query,
             owner=request.owner,
             consumers=request.consumers,
             update_frequency=request.update_frequency,
@@ -147,7 +260,7 @@ SELECT * FROM enriched_data"""
     async def run_data_product(
         self, data_product_id: str, force_rebuild: bool = False
     ) -> Dict[str, Any]:
-        """Run/refresh a data product."""
+        """Run/refresh a data product using direct Trino execution."""
         registry = self._load_registry()
 
         if data_product_id not in registry:
@@ -156,12 +269,16 @@ SELECT * FROM enriched_data"""
         data_product = registry[data_product_id]
 
         try:
-            # Run dbt model
-            result = await self.dbt_client.run_model(data_product.table_name)
+            # Use direct Trino execution instead of dbt
+            run_id = str(uuid.uuid4())
+            started_at = datetime.now(timezone.utc)
+            
+            # Create Iceberg table in gold layer using Trino directly
+            success = await self._create_gold_layer_table(data_product, data_product.source_query)
 
-            if result["success"]:
+            if success:
                 # Update last run timestamp
-                data_product.last_run_at = datetime.now(timezone.utc)
+                data_product.last_run_at = started_at
                 data_product.status = "active"
                 data_product.updated_at = datetime.now(timezone.utc)
 
@@ -170,11 +287,13 @@ SELECT * FROM enriched_data"""
 
                 return {
                     "data_product_id": data_product_id,
-                    "run_id": str(uuid.uuid4()),
+                    "run_id": run_id,
                     "status": "success",
-                    "started_at": datetime.now(timezone.utc),
-                    "message": "Data product refreshed successfully",
-                    "dbt_output": result["stdout"],
+                    "started_at": started_at,
+                    "completed_at": datetime.now(timezone.utc),
+                    "message": "Data product refreshed and saved to gold layer successfully using direct Trino execution",
+                    "table_location": f"{self.trino_client.catalog}.{self.trino_client.schema}.{data_product.table_name}",
+                    "execution_method": "direct_trino"
                 }
             else:
                 data_product.status = "failed"
@@ -183,7 +302,7 @@ SELECT * FROM enriched_data"""
 
                 raise HTTPException(
                     status_code=500,
-                    detail=f"dbt run failed: {result.get('stderr', 'Unknown error')}",
+                    detail="Failed to create gold layer table via direct Trino execution",
                 )
 
         except Exception as e:
@@ -210,18 +329,28 @@ SELECT * FROM enriched_data"""
                 detail=f"Data product table '{data_product.table_name}' not found. Run the data product first.",
             )
 
-        # Query the table
+        # Query the table from gold layer
         result = await self.trino_client.query_table(
             data_product.table_name, limit=limit, offset=offset, where_clause=where_clause
         )
 
+        # Update access timestamp for analytics
+        data_product.metadata = data_product.metadata or {}
+        data_product.metadata["last_accessed"] = datetime.now(timezone.utc).isoformat()
+        data_product.metadata["access_count"] = data_product.metadata.get("access_count", 0) + 1
+
+        registry[data_product_id] = data_product
+        self._save_registry(registry)
+
         return {
             "data_product_id": data_product_id,
+            "table_location": f"{self.trino_client.catalog}.{self.trino_client.schema}.{data_product.table_name}",
             "columns": [col["name"] for col in result.get("columns", [])],
             "data": result.get("data", []),
             "total_rows": len(result.get("data", [])),
             "returned_rows": len(result.get("data", [])),
             "query_timestamp": datetime.now(timezone.utc),
+            "data_layer": "gold",
         }
 
     async def list_data_products(self, page: int = 1, page_size: int = 20) -> Dict[str, Any]:

@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: asgard-data-products-api
+  namespace: asgard
+  labels:
+    app: asgard-data-products-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: asgard-data-products-api
+  template:
+    metadata:
+      labels:
+        app: asgard-data-products-api
+    spec:
+      containers:
+        - name: api
+          image: python:3.11-slim
+          ports:
+            - containerPort: 8000
+          env:
+            - name: PYTHONPATH
+              value: "/app"
+          envFrom:
+            - secretRef:
+                name: s3-credentials
+          command: ["/bin/sh"]
+          args:
+            - -c
+            - |
+              cd /app && 
+              pip install uv && 
+              uv pip install --system -r requirements.txt &&
+              python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+          volumeMounts:
+            - name: app-code
+              mountPath: /app
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+      volumes:
+        - name: app-code
+          configMap:
+            name: asgard-app-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: asgard-data-products-api
+  namespace: asgard
+spec:
+  selector:
+    app: asgard-data-products-api
+  ports:
+    - port: 8000
+      targetPort: 8000
+  type: ClusterIP

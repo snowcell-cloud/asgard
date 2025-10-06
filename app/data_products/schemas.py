@@ -62,6 +62,7 @@ class DataProductMetadata(BaseModel):
     name: str
     description: str
     data_product_type: DataProductType
+    source_query: str
     owner: str
     consumers: List[str]
     update_frequency: UpdateFrequency

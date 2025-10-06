@@ -1,0 +1,193 @@
+version: 2
+
+sources:
+  - name: silver_layer
+    description: "Silver layer data from Airbyte transformations"
+    database: "{{ var('source_catalog') }}"
+    schema: "{{ var('silver_schema') }}"
+    meta:
+      owner: "data-platform-team"
+      data_classification: "internal"
+      refresh_frequency: "hourly"
+
+    tables:
+      - name: customers
+        description: "Customer master data"
+        columns:
+          - name: customer_id
+            description: "Unique customer identifier"
+            data_type: varchar
+            tests:
+              - not_null
+              - unique
+          - name: name
+            description: "Customer full name"
+            data_type: varchar
+            tests:
+              - not_null
+          - name: email
+            description: "Customer email address"
+            data_type: varchar
+            tests:
+              - not_null
+              - unique
+          - name: registration_date
+            description: "Customer registration date"
+            data_type: date
+            tests:
+              - not_null
+          - name: created_at
+            description: "Record creation timestamp"
+            data_type: timestamp
+          - name: updated_at
+            description: "Record last update timestamp"
+            data_type: timestamp
+
+      - name: orders
+        description: "Customer order transactions"
+        columns:
+          - name: order_id
+            description: "Unique order identifier"
+            data_type: varchar
+            tests:
+              - not_null
+              - unique
+          - name: customer_id
+            description: "Foreign key to customers table"
+            data_type: varchar
+            tests:
+              - not_null
+              - relationships:
+                  to: source('silver_layer', 'customers')
+                  field: customer_id
+          - name: order_date
+            description: "Order placement date"
+            data_type: date
+            tests:
+              - not_null
+          - name: amount
+            description: "Order total amount"
+            data_type: decimal(10,2)
+            tests:
+              - not_null
+              - dbt_utils.accepted_range:
+                  min_value: 0
+          - name: status
+            description: "Order status"
+            data_type: varchar
+            tests:
+              - not_null
+              - accepted_values:
+                  values:
+                    [
+                      "pending",
+                      "processing",
+                      "shipped",
+                      "delivered",
+                      "cancelled",
+                    ]
+
+      - name: products
+        description: "Product catalog"
+        columns:
+          - name: product_id
+            description: "Unique product identifier"
+            data_type: varchar
+            tests:
+              - not_null
+              - unique
+          - name: product_name
+            description: "Product name"
+            data_type: varchar
+            tests:
+              - not_null
+          - name: category
+            description: "Product category"
+            data_type: varchar
+            tests:
+              - not_null
+          - name: price
+            description: "Product price"
+            data_type: decimal(10,2)
+            tests:
+              - not_null
+              - dbt_utils.accepted_range:
+                  min_value: 0
+
+      - name: order_items
+        description: "Order line items"
+        columns:
+          - name: order_item_id
+            description: "Unique order item identifier"
+            data_type: varchar
+            tests:
+              - not_null
+              - unique
+          - name: order_id
+            description: "Foreign key to orders table"
+            data_type: varchar
+            tests:
+              - not_null
+              - relationships:
+                  to: source('silver_layer', 'orders')
+                  field: order_id
+          - name: product_id
+            description: "Foreign key to products table"
+            data_type: varchar
+            tests:
+              - not_null
+              - relationships:
+                  to: source('silver_layer', 'products')
+                  field: product_id
+          - name: quantity
+            description: "Quantity ordered"
+            data_type: integer
+            tests:
+              - not_null
+              - dbt_utils.accepted_range:
+                  min_value: 1
+          - name: unit_price
+            description: "Unit price at time of order"
+            data_type: decimal(10,2)
+            tests:
+              - not_null
+              - dbt_utils.accepted_range:
+                  min_value: 0
+
+      - name: customer_events
+        description: "Customer behavioral events"
+        columns:
+          - name: event_id
+            description: "Unique event identifier"
+            data_type: varchar
+            tests:
+              - not_null
+              - unique
+          - name: customer_id
+            description: "Foreign key to customers table"
+            data_type: varchar
+            tests:
+              - not_null
+          - name: event_type
+            description: "Type of event"
+            data_type: varchar
+            tests:
+              - not_null
+              - accepted_values:
+                  values:
+                    [
+                      "page_view",
+                      "product_view",
+                      "add_to_cart",
+                      "purchase",
+                      "login",
+                      "logout",
+                    ]
+          - name: event_timestamp
+            description: "Event occurrence timestamp"
+            data_type: timestamp
+            tests:
+              - not_null
+          - name: properties
+            description: "Event properties as JSON"
+            data_type: json

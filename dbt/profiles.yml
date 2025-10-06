@@ -4,22 +4,21 @@ asgard_data_products:
     dev:
       type: trino
       method: none
+      user: dbt
       host: trino.data-platform.svc.cluster.local
       port: 8080
-      catalog: nessie
+      catalog: iceberg
       schema: gold
       threads: 4
       http_scheme: http
-      session_properties:
-        iceberg.target-file-size-bytes: "134217728"
-        iceberg.compression-codec: "SNAPPY"
 
     prod:
       type: trino
       method: none
+      user: dbt
       host: trino.data-platform.svc.cluster.local
       port: 8080
-      catalog: nessie
+      catalog: iceberg
       schema: gold
       threads: 8
       http_scheme: http

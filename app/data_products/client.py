@@ -20,7 +20,7 @@ class TrinoClient:
         self,
         host: str = "trino.data-platform.svc.cluster.local",
         port: int = 8080,
-        catalog: str = "nessie",
+        catalog: str = "iceberg",
         schema: str = "gold",
         user: str = "dbt",
     ):
