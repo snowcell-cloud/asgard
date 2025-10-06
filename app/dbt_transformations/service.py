@@ -38,11 +38,9 @@ class DBTTransformationService:
         # Ensure the directory exists
         os.makedirs(self.dbt_project_dir, exist_ok=True)
         # Trino configuration for data-platform namespace
-        self.trino_host = os.getenv(
-            "TRINO_HOST", "trino-coordinator.data-platform.svc.cluster.local"
-        )
+        self.trino_host = os.getenv("TRINO_HOST", "trino.data-platform.svc.cluster.local")
         self.trino_port = int(os.getenv("TRINO_PORT", "8080"))
-        self.trino_user = os.getenv("TRINO_USER", "trino")
+        self.trino_user = os.getenv("TRINO_USER", "dbt")
 
         # Iceberg catalog configuration
         self.catalog = os.getenv("TRINO_CATALOG", "iceberg")
@@ -253,12 +251,16 @@ asgard:
     prod:
       type: trino
       method: none
+      user: {self.trino_user}
       host: {self.trino_host}
       port: {self.trino_port}
-      user: {self.trino_user}
       catalog: {self.catalog}
       schema: {self.gold_schema}
-      threads: 1
+      threads: 4
+      http_scheme: http
+      session_properties:
+        iceberg.target-file-size-bytes: "268435456"
+        iceberg.compression-codec: "SNAPPY"
 """
             with open(profiles_yml, "w") as f:
                 f.write(profiles_content.strip())

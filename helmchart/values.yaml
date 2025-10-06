@@ -16,9 +16,9 @@ env:
   SPARK_SERVICE_ACCOUNT: "spark-sa"
   S3_SECRET_NAME: "s3-credentials"
   # Production data platform services in data-platform namespace
-  TRINO_HOST: "trino-coordinator.data-platform.svc.cluster.local"
+  TRINO_HOST: "trino.data-platform.svc.cluster.local"
   TRINO_PORT: "8080"
-  TRINO_USER: "trino"
+  TRINO_USER: "dbt"
   TRINO_CATALOG: "iceberg"
   NESSIE_URI: "http://nessie.data-platform.svc.cluster.local:19120/api/v1"
   NESSIE_REF: "main"
