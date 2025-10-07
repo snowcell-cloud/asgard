@@ -9,7 +9,7 @@ from app.data_transformation.client import get_spark_client, SparkApplicationCli
 from app.data_transformation.service import TransformationService
 from app.airbyte.client import get_airbyte_client_dependency, AirbyteClient
 
-router = APIRouter(tags=["Data Transformation"])
+router = APIRouter(prefix="/spark", tags=["Data Transformation"])
 
 
 def get_transformation_service(
