@@ -303,6 +303,13 @@ asgard:
             with open(profiles_yml, "w") as f:
                 f.write(profiles_content.strip())
 
+            print(f"📝 Generated profiles.yml:")
+            print(f"   Host: {self.trino_host}")
+            print(f"   Port: {self.trino_port}")
+            print(f"   User: {self.trino_user}")
+            print(f"   Catalog: {self.catalog}")
+            print(f"   Schema: {self.gold_schema}")
+
     def _create_model_file(self, model_name: str, model_content: str) -> str:
         """Create a temporary dbt model file."""
         # Ensure dbt project structure exists
@@ -325,9 +332,28 @@ asgard:
             original_cwd = os.getcwd()
             os.chdir(self.dbt_project_dir)
 
+            # Ensure environment variables are passed to subprocess
+            env = os.environ.copy()
+
+            # Add DNS debugging
+            print(f"🔍 DNS Test before dbt run:")
+            try:
+                import socket
+
+                resolved_ip = socket.gethostbyname(self.trino_host)
+                print(f"   {self.trino_host} resolves to {resolved_ip}")
+            except Exception as dns_err:
+                print(f"   ⚠️ DNS resolution failed: {dns_err}")
+
             # Run dbt debug first to check connection
             debug_cmd = ["uv", "run", "dbt", "debug", "--profiles-dir", ".", "--project-dir", "."]
-            debug_result = subprocess.run(debug_cmd, capture_output=True, text=True, timeout=60)
+            debug_result = subprocess.run(
+                debug_cmd,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env=env,  # Pass environment variables
+            )
 
             print(f"DBT Debug Output:\n{debug_result.stdout}\n{debug_result.stderr}")
 
@@ -346,7 +372,11 @@ asgard:
             ]
 
             result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=300  # 5 minute timeout
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minute timeout
+                env=env,  # Pass environment variables
             )
 
             print(f"DBT Run Output:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}")
