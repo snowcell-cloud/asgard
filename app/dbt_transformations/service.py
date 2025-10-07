@@ -109,7 +109,7 @@ class DBTTransformationService:
         try:
             # Create transformation metadata
             transformation_data = {
-                "id": transformation_id,
+                "transformation_id": transformation_id,
                 "name": request.name,
                 "sql_query": request.sql_query,
                 "description": request.description,
