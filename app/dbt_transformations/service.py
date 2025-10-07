@@ -202,9 +202,9 @@ class DBTTransformationService:
         """Generate dbt model content from the transformation request."""
 
         # Build model configuration
+        # Note: schema is already set in profiles.yml, don't set it here to avoid duplication
         config = {
             "materialized": request.materialization.value,
-            "schema": self.gold_schema,
         }
 
         if request.materialization == MaterializationType.INCREMENTAL:
@@ -275,7 +275,6 @@ models:
   asgard_transformations:
     gold:
       +materialized: table
-      +schema: gold
 """
             with open(dbt_project_yml, "w") as f:
                 f.write(dbt_project_content.strip())
