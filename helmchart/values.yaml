@@ -25,6 +25,10 @@ env:
   NESSIE_AUTH_TYPE: "NONE"
   SILVER_SCHEMA: "silver"
   GOLD_SCHEMA: "gold"
+  # Feast feature store configuration
+  FEAST_REPO_PATH: "/tmp/feast_repo"
+  MODEL_STORAGE_PATH: "/tmp/models"
+  DBT_PROJECT_DIR: "/tmp/dbt_projects"
 
 serviceAccount:
   create: true

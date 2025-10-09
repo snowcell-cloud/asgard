@@ -1,0 +1,51 @@
+"""
+Feast Feature Store initialization.
+"""
+
+from app.feast.schemas import (
+    BatchPredictionRequest,
+    DataSourceConfig,
+    EntityDefinition,
+    FeatureDefinition,
+    FeatureServiceRequest,
+    FeatureSetResponse,
+    FeatureStoreStatus,
+    FeatureValueType,
+    FeatureViewInfo,
+    FeatureViewRequest,
+    HyperParameters,
+    ModelFramework,
+    ModelInfo,
+    ModelMetrics,
+    ModelTrainingRequest,
+    ModelTrainingResponse,
+    ModelType,
+    OnlinePredictionRequest,
+    PredictionMode,
+    PredictionResponse,
+    TrainingDataConfig,
+)
+
+__all__ = [
+    "FeatureValueType",
+    "FeatureDefinition",
+    "EntityDefinition",
+    "DataSourceConfig",
+    "FeatureViewRequest",
+    "FeatureServiceRequest",
+    "FeatureSetResponse",
+    "ModelFramework",
+    "ModelType",
+    "TrainingDataConfig",
+    "HyperParameters",
+    "ModelTrainingRequest",
+    "ModelMetrics",
+    "ModelTrainingResponse",
+    "PredictionMode",
+    "OnlinePredictionRequest",
+    "BatchPredictionRequest",
+    "PredictionResponse",
+    "FeatureViewInfo",
+    "ModelInfo",
+    "FeatureStoreStatus",
+]

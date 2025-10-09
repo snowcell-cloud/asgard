@@ -8,6 +8,7 @@ A comprehensive FastAPI-based data platform that provides unified REST APIs for 
 
 - **[📘 Complete Platform Documentation](./docs/DOCUMENTATION.md)** - Comprehensive guide covering architecture, APIs, deployment, troubleshooting, and best practices
 - **[📗 Transformation APIs Guide](./docs/TRANSFORMATION_APIs_DOCUMENTATION.md)** - Deep dive into Spark and DBT transformation APIs with examples and use cases
+- **[🎯 Feast Feature Store Guide](./docs/FEAST_COMPLETE_GUIDE.md)** - Complete guide for ML feature store, model training, and predictions
 - **[📖 Documentation Index](./docs/README.md)** - Navigation guide to all documentation
 
 ## 🚀 Quick Start

@@ -39,6 +39,9 @@ RUN chown -R app:app /app
 # Create writable temp directory for dbt projects
 RUN mkdir -p /tmp/dbt_projects && chown app:app /tmp/dbt_projects
 
+# Create writable directories for Feast and ML models
+RUN mkdir -p /tmp/feast_repo /tmp/models && chown app:app /tmp/feast_repo /tmp/models
+
 # Switch to app user
 USER app
 
@@ -46,6 +49,8 @@ USER app
 ENV UV_SYSTEM_PYTHON=1
 ENV DBT_PROJECT_DIR=/tmp/dbt_projects
 ENV TMPDIR=/tmp
+ENV FEAST_REPO_PATH=/tmp/feast_repo
+ENV MODEL_STORAGE_PATH=/tmp/models
 
 # Install dependencies with uv sync (production only)
 RUN uv sync --frozen --no-dev
