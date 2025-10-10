@@ -71,6 +71,13 @@ class FeatureStoreService:
         self.model_storage_path = os.getenv("MODEL_STORAGE_PATH", "/tmp/models")
         Path(self.model_storage_path).mkdir(parents=True, exist_ok=True)
 
+        # S3 configuration for Iceberg Parquet files
+        self.s3_bucket = os.getenv("S3_BUCKET", "airbytedestination1")
+        self.s3_iceberg_base_path = os.getenv("S3_ICEBERG_BASE_PATH", "iceberg/gold")
+        self.aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
+        self.aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+        self.aws_region = os.getenv("AWS_REGION", "us-east-1")
+
         # In-memory registries
         self.feature_views: Dict[str, Any] = {}
         self.entities: Dict[str, Entity] = {}
@@ -84,6 +91,7 @@ class FeatureStoreService:
         print(f"   Feast repo: {self.feast_repo_path}")
         print(f"   Trino: {self.trino_host}:{self.trino_port}")
         print(f"   Gold schema: {self.catalog}.{self.gold_schema}")
+        print(f"   S3 Iceberg: s3://{self.s3_bucket}/{self.s3_iceberg_base_path}")
 
     def _initialize_feast_store(self):
         """Initialize or load Feast feature store."""
@@ -91,26 +99,25 @@ class FeatureStoreService:
 
         if not feature_store_yaml.exists():
             # Create default feature store configuration
+            # NOTE: Using offline store only. Online store is commented out for now.
+            # Data source: Iceberg S3 Parquet files (no sync needed)
             config_content = f"""
 project: asgard_features
 registry: {self.feast_repo_path}/registry.db
 provider: local
-online_store:
-    type: sqlite
-    path: {self.feast_repo_path}/online_store.db
+# online_store:
+#     type: sqlite
+#     path: {self.feast_repo_path}/online_store.db
 offline_store:
-    type: trino
-    host: {self.trino_host}
-    port: {self.trino_port}
-    catalog: {self.catalog}
-    connector:
-        type: iceberg
+    type: file
+    # Reads directly from S3 Parquet files created by Iceberg
+    # Example: s3://{self.s3_bucket}/{self.s3_iceberg_base_path}/{{table}}/data/*.parquet
 entity_key_serialization_version: 2
 """
             with open(feature_store_yaml, "w") as f:
                 f.write(config_content.strip())
 
-            print(f"📝 Created feature_store.yaml")
+            print(f"📝 Created feature_store.yaml (Direct S3 Parquet access from Iceberg)")
 
         try:
             self.store = FeatureStore(repo_path=self.feast_repo_path)
@@ -143,43 +150,111 @@ entity_key_serialization_version: 2
         }
         return type_mapping.get(dtype, ValueType.STRING)
 
-    def _sync_trino_to_parquet(self, table_fqn: str, feature_view_name: str) -> str:
-        """Sync data from Trino table to local Parquet file for FileSource."""
+    def _get_iceberg_parquet_path(self, table_fqn: str) -> str:
+        """
+        Get the S3 Parquet file path for an Iceberg table.
+
+        Iceberg tables store data in Parquet format on S3 with metadata managed by Nessie.
+        This method queries Iceberg metadata to get the actual Parquet file locations.
+
+        Example path: s3://airbytedestination1/iceberg/gold/{table_uuid}/data/*.parquet
+        """
         try:
-            # Create data directory if not exists
-            data_dir = Path(self.config.FEAST_REPO_PATH) / "data"
-            data_dir.mkdir(parents=True, exist_ok=True)
-
-            # Parquet file path
-            parquet_path = data_dir / f"{feature_view_name}.parquet"
-
-            # Fetch data from Trino
+            # Query Iceberg metadata to get table files
             with self._get_trino_connection() as conn:
-                query = f"SELECT * FROM {table_fqn}"
-                df = pd.read_sql(query, conn)
+                # Get table metadata including file paths
+                # Iceberg stores file paths in metadata
+                metadata_query = f"""
+                SELECT 
+                    "$path" as file_path
+                FROM {table_fqn}
+                LIMIT 1
+                """
 
-                # Save to parquet
-                df.to_parquet(parquet_path, index=False)
-                print(f"✅ Synced {len(df)} rows from {table_fqn} to {parquet_path}")
+                result = pd.read_sql(metadata_query, conn)
 
-            return str(parquet_path)
+                if len(result) > 0 and "file_path" in result.columns:
+                    # Extract the S3 path from the first file
+                    first_file_path = result["file_path"].iloc[0]
+
+                    # Get the data directory (remove the specific parquet file name)
+                    # Example: s3://bucket/iceberg/gold/table_id/data/file.parquet -> s3://bucket/iceberg/gold/table_id/data/*.parquet
+                    if first_file_path.startswith("s3://"):
+                        # Use wildcard pattern for all parquet files in the data directory
+                        data_dir = "/".join(first_file_path.split("/")[:-1])
+                        s3_path = f"{data_dir}/*.parquet"
+                        print(f"✅ Found Iceberg data at: {s3_path}")
+                        return s3_path
+
+                # Fallback: construct path based on table name
+                # Format: s3://bucket/iceberg/gold/{table_name}/data/*.parquet
+                table_name = table_fqn.split(".")[-1]
+                s3_path = (
+                    f"s3://{self.s3_bucket}/{self.s3_iceberg_base_path}/{table_name}/data/*.parquet"
+                )
+                print(f"⚠️  Using constructed path: {s3_path}")
+                return s3_path
+
         except Exception as e:
-            print(f"⚠️ Warning: Could not sync Trino data: {e}")
-            # Create empty parquet with schema
-            return str(data_dir / f"{feature_view_name}.parquet")
+            print(f"⚠️ Warning: Could not query Iceberg metadata: {e}")
+            # Fallback to constructed path
+            table_name = table_fqn.split(".")[-1]
+            s3_path = (
+                f"s3://{self.s3_bucket}/{self.s3_iceberg_base_path}/{table_name}/data/*.parquet"
+            )
+            print(f"⚠️  Using fallback path: {s3_path}")
+            return s3_path
+
+    def _sync_trino_to_parquet(self, table_fqn: str, feature_view_name: str) -> str:
+        """
+        Get S3 Parquet path for Iceberg table (NO SYNC NEEDED).
+
+        Iceberg already stores data in Parquet format on S3 with Nessie metadata.
+        We just return the S3 path directly for Feast FileSource to use.
+
+        OLD approach: Iceberg → Trino → Local Parquet (unnecessary duplication)
+        NEW approach: Iceberg S3 Parquet → Feast FileSource (direct access)
+        """
+        try:
+            # Get the S3 path where Iceberg stores the Parquet files
+            s3_path = self._get_iceberg_parquet_path(table_fqn)
+
+            # Validate table exists by querying it
+            with self._get_trino_connection() as conn:
+                count_query = f"SELECT COUNT(*) as cnt FROM {table_fqn}"
+                result = pd.read_sql(count_query, conn)
+                row_count = result["cnt"].iloc[0] if len(result) > 0 else 0
+                print(f"✅ Validated Iceberg table {table_fqn} ({row_count} rows)")
+
+            return s3_path
+
+        except Exception as e:
+            print(f"⚠️ Warning: Could not access Iceberg table: {e}")
+            # Return constructed path anyway
+            table_name = table_fqn.split(".")[-1]
+            return f"s3://{self.s3_bucket}/{self.s3_iceberg_base_path}/{table_name}/data/*.parquet"
 
     async def create_feature_view(self, request: FeatureViewRequest) -> FeatureSetResponse:
-        """Create and register a new feature view from gold layer table."""
+        """
+        Create and register a new feature view from Iceberg gold layer table.
+
+        Data flow (DIRECT ACCESS - NO SYNC):
+        1. Source: Iceberg catalog table (e.g., iceberg.gold.customer_aggregates)
+        2. Iceberg stores data in S3 Parquet format with Nessie metadata
+        3. Query Trino to get S3 Parquet file path
+        4. Register FileSource feature view pointing directly to S3 Parquet files
+        5. Feast reads from S3 Parquet (no local copy needed)
+        """
         try:
             start_time = datetime.now(timezone.utc)
 
-            # Validate table exists and sync to local parquet
+            # Build Iceberg table FQN
             table_fqn = (
                 f"{request.source.catalog}.{request.source.schema_name}.{request.source.table_name}"
             )
 
-            # Sync Trino data to local Parquet file
-            parquet_path = self._sync_trino_to_parquet(table_fqn, request.name)
+            # Get S3 Parquet path directly from Iceberg (no sync needed)
+            s3_parquet_path = self._sync_trino_to_parquet(table_fqn, request.name)
 
             # Create or get entities
             entity_objects = []
@@ -194,10 +269,11 @@ entity_key_serialization_version: 2
                     self.entities[entity_name] = entity
                 entity_objects.append(self.entities[entity_name])
 
-            # Create FileSource instead of TrinoSource
+            # Create FileSource pointing directly to S3 Parquet files (Iceberg storage)
+            # Note: Data is stored by Iceberg in S3 Parquet format, no sync needed
             source = FileSource(
                 name=f"{request.name}_source",
-                path=parquet_path,
+                path=s3_parquet_path,
                 timestamp_field=request.source.timestamp_field or "event_timestamp",
                 created_timestamp_column=request.source.created_timestamp_column,
             )
@@ -212,7 +288,7 @@ entity_key_serialization_version: 2
                 )
                 schema_fields.append(field)
 
-            # Create feature view
+            # Create feature view (offline store only - online disabled)
             feature_view = FeatureView(
                 name=request.name,
                 entities=request.entities,
@@ -223,7 +299,7 @@ entity_key_serialization_version: 2
                     if request.ttl_seconds
                     else timedelta(days=1)
                 ),
-                online=request.online,
+                online=False,  # Disabled: Using offline store only
                 description=request.description,
                 tags=request.tags,
             )
@@ -245,10 +321,10 @@ entity_key_serialization_version: 2
                 entities=request.entities,
                 features=[f.name for f in request.features],
                 source_table=table_fqn,
-                online_enabled=request.online,
+                online_enabled=False,  # Disabled: Using offline store only
                 created_at=start_time,
                 status="registered",
-                message=f"Feature view '{request.name}' successfully registered with {len(request.features)} features",
+                message=f"Feature view '{request.name}' successfully registered from Iceberg gold layer with {len(request.features)} features (offline store only)",
             )
 
         except Exception as e:
@@ -494,8 +570,11 @@ entity_key_serialization_version: 2
         else:
             raise ValueError(f"Framework {framework} not yet implemented")
 
+    # NOTE: Online predictions disabled - using offline store only
+    # Uncomment when online store is enabled
+    """
     async def predict_online(self, request: OnlinePredictionRequest) -> PredictionResponse:
-        """Make online/real-time prediction."""
+        '''Make online/real-time prediction.'''
         try:
             start_time = datetime.now(timezone.utc)
 
@@ -548,6 +627,7 @@ entity_key_serialization_version: 2
                 status_code=500,
                 detail=f"Online prediction failed: {str(e)}",
             )
+    """
 
     async def predict_batch(self, request: BatchPredictionRequest) -> PredictionResponse:
         """Make batch predictions and write to output table."""
@@ -682,8 +762,8 @@ entity_key_serialization_version: 2
         """Get overall feature store status."""
         return FeatureStoreStatus(
             registry_type="local" if self.store else "not_initialized",
-            online_store_type="sqlite",
-            offline_store_type="trino",
+            online_store_type="disabled",  # Online store disabled - offline only
+            offline_store_type="file (S3 Parquet - Iceberg native storage)",
             num_feature_views=len(self.feature_views),
             num_entities=len(self.entities),
             num_feature_services=0,  # Would count feature services

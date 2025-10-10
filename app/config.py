@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     aws_access_key_id: Optional[str] = None
     aws_secret_access_key: Optional[str] = None
     aws_region: str = "us-east-1"
+    s3_bucket: str = "airbytedestination1"
+    s3_iceberg_base_path: str = "iceberg/gold"
 
     # Spark configuration
     spark_app_name: str = "asgard-data-transform"

@@ -87,7 +87,10 @@ class FeatureViewRequest(BaseModel):
     )
     description: Optional[str] = Field(None, description="Feature view description")
     tags: Dict[str, str] = Field(default_factory=dict, description="Feature view tags")
-    online: bool = Field(True, description="Enable online serving")
+    # NOTE: Online serving disabled - using offline store only
+    online: bool = Field(
+        False, description="Enable online serving (currently disabled - offline only)"
+    )
 
     @validator("ttl_seconds")
     def validate_ttl(cls, v):

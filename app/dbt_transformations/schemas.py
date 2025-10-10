@@ -58,11 +58,11 @@ class DBTTransformationRequest(BaseModel):
     )
 
     owner: Optional[str] = Field(
-        None, description="Owner/creator of this transformation", max_length=100
+        "dbt", description="Owner/creator of this transformation", max_length=100
     )
 
     incremental_strategy: Optional[str] = Field(
-        None,
+        "append",
         description="Strategy for incremental models (merge, append, delete+insert)",
         pattern="^(merge|append|delete_insert)$",
     )

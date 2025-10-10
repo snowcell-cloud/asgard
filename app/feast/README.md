@@ -2,13 +2,27 @@
 
 This module provides a complete feature store and ML platform built on Feast, integrated with the Asgard Data Platform.
 
-## 🎯 Features
+## �️ Architecture
 
-- **Feature Store**: Register and serve features from gold layer tables
+**Data Source**: Iceberg Catalog (Gold Layer)
+
+- Features are sourced from Iceberg tables managed by Trino
+- Data flows: `Iceberg Gold Layer → Trino → Local Parquet → Feast Offline Store`
+- Enables feature serving directly from your data lakehouse
+
+**Current Configuration**: OFFLINE STORE ONLY
+
+- Online predictions disabled (code preserved in comments for future enablement)
+- Use batch predictions for model inference
+- SQLite registry for feature metadata
+
+## �🎯 Features
+
+- **Feature Store**: Register and serve features from Iceberg gold layer tables
 - **ML Training**: Train models using scikit-learn, XGBoost, and more
 - **Model Registry**: Version and manage trained models
-- **Online Predictions**: Low-latency real-time inference
-- **Batch Predictions**: High-throughput bulk scoring
+- **Batch Predictions**: High-throughput bulk scoring (offline store)
+- ~~**Online Predictions**: Low-latency real-time inference~~ (DISABLED - offline only)
 
 ## 📁 Module Structure
 
@@ -16,13 +30,13 @@ This module provides a complete feature store and ML platform built on Feast, in
 app/feast/
 ├── __init__.py          # Module exports
 ├── schemas.py           # Pydantic models for API
-├── service.py           # Core feature store service
-└── router.py            # FastAPI endpoints
+├── service.py           # Core feature store service (Iceberg integration)
+└── router.py            # FastAPI endpoints (8 active, 1 disabled)
 ```
 
 ## 🚀 Quick Start
 
-### 1. Register Features
+### 1. Register Features from Iceberg Gold Layer
 
 ```python
 POST /feast/features
@@ -34,9 +48,12 @@ POST /feast/features
     {"name": "avg_order_value", "dtype": "float64"}
   ],
   "source": {
+    "catalog": "iceberg",
+    "schema": "gold",
     "table_name": "customer_aggregates",
     "timestamp_field": "updated_at"
-  }
+  },
+  "online": false
 }
 ```
 

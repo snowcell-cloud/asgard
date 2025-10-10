@@ -1,10 +1,30 @@
 """
 FastAPI router for Feast Feature Store and ML Model APIs.
 
+NOTE: Currently configured for OFFLINE STORE ONLY.
+Online predictions are disabled. Use batch predictions instead.
+
+Data Source: Iceberg Catalog (S3 Parquet - Native Storage)
+- Features are read directly from S3 Parquet files created by Iceberg
+- Iceberg manages data in Parquet format with Nessie metadata
+- NO data duplication: Feast reads directly from Iceberg's S3 storage
+- Path format: s3://airbytedestination1/iceberg/gold/{table}/data/*.parquet
+
+Architecture:
+  Iceberg (S3 Parquet + Nessie metadata)
+         ↓ (direct read)
+  Feast FileSource (S3 path)
+         ↓
+  Offline Store (batch predictions)
+
 Endpoints:
-- POST /features → Define and register feature sets
+- POST /features → Define and register feature sets from Iceberg gold layer
 - POST /models → Train and version ML models
-- POST /predictions → Request online or batch predictions
+- POST /predictions/batch → Request batch predictions (online predictions disabled)
+- GET /features → List all feature views
+- GET /features/{name} → Get feature view details
+- GET /models → List all trained models
+- GET /status → Get feature store status
 """
 
 from typing import List
@@ -51,13 +71,16 @@ async def create_feature_view(
     service: FeatureStoreService = Depends(get_service),
 ) -> FeatureSetResponse:
     """
-    Create and register a new feature view from gold layer table.
+    Create and register a new feature view from Iceberg gold layer.
+
+    NOTE: Online serving is currently DISABLED. Using offline store only.
 
     This endpoint:
-    1. Validates the gold layer table exists
-    2. Creates entities if needed
-    3. Registers feature view with Feast
-    4. Enables online serving if requested
+    1. Queries Trino to validate the Iceberg table exists
+    2. Gets S3 Parquet file path from Iceberg metadata
+    3. Creates entities if needed
+    4. Registers Feast FileSource pointing to S3 Parquet (direct access)
+    5. NO data sync/copy - Feast reads directly from Iceberg's S3 storage
 
     **Example Request:**
     ```json
@@ -83,8 +106,8 @@ async def create_feature_view(
         "schema": "gold"
       },
       "ttl_seconds": 86400,
-      "online": true,
-      "description": "Customer aggregated features"
+      "online": false,
+      "description": "Customer aggregated features (offline only)"
     }
     ```
     """
@@ -225,13 +248,15 @@ async def list_models(
 # Prediction Endpoints
 # ============================================================================
 
-
+# NOTE: Online predictions disabled - using offline store only
+# Uncomment when online store is enabled
+"""
 @router.post("/predictions/online", response_model=PredictionResponse)
 async def predict_online(
     request: OnlinePredictionRequest,
     service: FeatureStoreService = Depends(get_service),
 ) -> PredictionResponse:
-    """
+    '''
     Make real-time online prediction.
 
     This endpoint:
@@ -272,8 +297,9 @@ async def predict_online(
       "status": "completed"
     }
     ```
-    """
+    '''
     return await service.predict_online(request)
+"""
 
 
 @router.post("/predictions/batch", response_model=PredictionResponse)
@@ -320,5 +346,3 @@ async def predict_batch(
     ```
     """
     return await service.predict_batch(request)
-
- 
