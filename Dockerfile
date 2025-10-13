@@ -1,5 +1,12 @@
 FROM python:3.10-slim AS builder
 
+# Install build dependencies for packages that need compilation
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
@@ -20,6 +27,13 @@ RUN uv run pytest
 
 # Production stage
 FROM python:3.10-slim AS production
+
+# Install build dependencies for packages that need compilation
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
@@ -52,7 +66,7 @@ ENV TMPDIR=/tmp
 ENV FEAST_REPO_PATH=/tmp/feast_repo
 ENV MODEL_STORAGE_PATH=/tmp/models
 # Install dependencies with uv sync (production only)
-RUN uv sync  
+RUN uv sync --frozen --no-dev
 
 EXPOSE 8000
 
