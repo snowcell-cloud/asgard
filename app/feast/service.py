@@ -76,7 +76,7 @@ class FeatureStoreService:
         self.s3_iceberg_base_path = os.getenv("S3_ICEBERG_BASE_PATH", "iceberg/gold")
         self.aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
         self.aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-        self.aws_region = os.getenv("AWS_REGION", "us-east-1")
+        self.aws_region = os.getenv("AWS_REGION", "eu-north-1")
 
         # Test mode: skip S3 validation (for development without S3 access)
         self.test_mode = os.getenv("FEAST_TEST_MODE", "false").lower() == "true"
@@ -113,6 +113,7 @@ provider: local
 #     path: {self.feast_repo_path}/online_store.db
 offline_store:
     type: file
+    region: {self.aws_region}
     # Reads directly from S3 Parquet files created by Iceberg
     # Example: s3://{self.s3_bucket}/{self.s3_iceberg_base_path}/{{table}}/data/*.parquet
 entity_key_serialization_version: 2
