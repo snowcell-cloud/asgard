@@ -52,7 +52,7 @@ ENV TMPDIR=/tmp
 ENV FEAST_REPO_PATH=/tmp/feast_repo
 ENV MODEL_STORAGE_PATH=/tmp/models
 # Install dependencies with uv sync (production only)
-RUN uv sync --frozen --no-dev
+RUN uv sync  
 
 EXPOSE 8000
 
