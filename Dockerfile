@@ -24,6 +24,11 @@ FROM python:3.10-slim AS production
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
+# Install build dependencies for C extensions (httptools, etc.)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc g++ make && \
+    rm -rf /var/lib/apt/lists/*
+
 # Create non-root user first
 RUN useradd --create-home --shell /bin/bash app
 
@@ -54,6 +59,12 @@ ENV MODEL_STORAGE_PATH=/tmp/models
 
 # Install dependencies with uv sync (production only)
 RUN uv sync --frozen --no-dev
+
+# Remove build dependencies to reduce image size
+USER root
+RUN apt-get purge -y --auto-remove gcc g++ make && \
+    rm -rf /var/lib/apt/lists/*
+USER app
 
 EXPOSE 8000
 
