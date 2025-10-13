@@ -24,12 +24,13 @@ FROM python:3.10-slim AS production
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-# Install build dependencies for C extensions (httptools, cffi/cryptography, etc.)
+# Install build dependencies for C extensions (httptools, cffi/cryptography, pyarrow, etc.)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         gcc \
         g++ \
         make \
+        cmake \
         libffi-dev \
         libssl-dev \
         python3-dev && \
@@ -70,7 +71,7 @@ RUN uv sync --frozen --no-dev
 USER root
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libffi8 libssl3 && \
-    apt-get purge -y --auto-remove gcc g++ make libffi-dev libssl-dev python3-dev && \
+    apt-get purge -y --auto-remove gcc g++ make cmake libffi-dev libssl-dev python3-dev && \
     rm -rf /var/lib/apt/lists/*
 USER app
 
