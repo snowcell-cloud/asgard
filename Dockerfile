@@ -1,11 +1,14 @@
-FROM python:3.10-slim AS builder
+FROM python:3.11-slim AS builder
 
 # Install build dependencies for packages that need compilation
+# Including Apache Arrow development libraries for pyarrow
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     build-essential \
     cmake \
+    libarrow-dev \
+    libparquet-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
@@ -27,14 +30,17 @@ RUN uv sync --frozen
 RUN uv run pytest
 
 # Production stage
-FROM python:3.10-slim AS production
+FROM python:3.11-slim AS production
 
 # Install build dependencies for packages that need compilation
+# Including Apache Arrow development libraries for pyarrow
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     build-essential \
     cmake \
+    libarrow-dev \
+    libparquet-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
