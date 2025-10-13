@@ -27,7 +27,7 @@ from feast import (
     PushSource,
     ValueType,
 )
-from feast.types import Float32, Float64, Int32, Int64, String
+from feast.types import Float32, Float64, Int32, Int64, String, Bool, UnixTimestamp
 import trino
 from trino.dbapi import connect
 
@@ -78,6 +78,9 @@ class FeatureStoreService:
         self.aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
         self.aws_region = os.getenv("AWS_REGION", "us-east-1")
 
+        # Test mode: skip S3 validation (for development without S3 access)
+        self.test_mode = os.getenv("FEAST_TEST_MODE", "false").lower() == "true"
+
         # In-memory registries
         self.feature_views: Dict[str, Any] = {}
         self.entities: Dict[str, Entity] = {}
@@ -114,6 +117,15 @@ offline_store:
     # Example: s3://{self.s3_bucket}/{self.s3_iceberg_base_path}/{{table}}/data/*.parquet
 entity_key_serialization_version: 2
 """
+            # Add AWS credentials if available
+            if self.aws_access_key_id and self.aws_secret_access_key:
+                config_content += f"""
+# AWS Configuration for S3 access
+aws_access_key_id: {self.aws_access_key_id}
+aws_secret_access_key: {self.aws_secret_access_key}
+aws_region: {self.aws_region}
+"""
+
             with open(feature_store_yaml, "w") as f:
                 f.write(config_content.strip())
 
@@ -137,18 +149,22 @@ entity_key_serialization_version: 2
             http_scheme="http",
         )
 
-    def _map_feast_type(self, dtype: FeatureValueType) -> ValueType:
-        """Map our FeatureValueType to Feast ValueType."""
+    def _map_feast_type(self, dtype: FeatureValueType):
+        """Map our FeatureValueType to Feast PrimitiveFeastType."""
+        # Handle both enum and string values
+        if isinstance(dtype, str):
+            dtype = FeatureValueType(dtype)
+
         type_mapping = {
-            FeatureValueType.INT32: ValueType.INT32,
-            FeatureValueType.INT64: ValueType.INT64,
-            FeatureValueType.FLOAT32: ValueType.FLOAT32,
-            FeatureValueType.FLOAT64: ValueType.FLOAT64,
-            FeatureValueType.STRING: ValueType.STRING,
-            FeatureValueType.BOOL: ValueType.BOOL,
-            FeatureValueType.UNIX_TIMESTAMP: ValueType.UNIX_TIMESTAMP,
+            FeatureValueType.INT32: Int32,
+            FeatureValueType.INT64: Int64,
+            FeatureValueType.FLOAT32: Float32,
+            FeatureValueType.FLOAT64: Float64,
+            FeatureValueType.STRING: String,
+            FeatureValueType.BOOL: Bool,
+            FeatureValueType.UNIX_TIMESTAMP: UnixTimestamp,
         }
-        return type_mapping.get(dtype, ValueType.STRING)
+        return type_mapping.get(dtype, String)
 
     def _get_iceberg_parquet_path(self, table_fqn: str) -> str:
         """
@@ -267,7 +283,19 @@ entity_key_serialization_version: 2
                         description=f"Entity for {entity_name}",
                     )
                     self.entities[entity_name] = entity
+                    # Register entity immediately
+                    if self.store:
+                        self.store.apply([entity])
                 entity_objects.append(self.entities[entity_name])
+
+            # Set AWS credentials in environment for PyArrow S3 access
+            if self.aws_access_key_id:
+                os.environ["AWS_ACCESS_KEY_ID"] = self.aws_access_key_id
+            if self.aws_secret_access_key:
+                os.environ["AWS_SECRET_ACCESS_KEY"] = self.aws_secret_access_key
+            if self.aws_region:
+                os.environ["AWS_DEFAULT_REGION"] = self.aws_region
+                os.environ["AWS_REGION"] = self.aws_region
 
             # Create FileSource pointing directly to S3 Parquet files (Iceberg storage)
             # Note: Data is stored by Iceberg in S3 Parquet format, no sync needed
@@ -291,7 +319,7 @@ entity_key_serialization_version: 2
             # Create feature view (offline store only - online disabled)
             feature_view = FeatureView(
                 name=request.name,
-                entities=request.entities,
+                entities=entity_objects,  # Pass Entity objects, not strings
                 schema=schema_fields,
                 source=source,
                 ttl=(
@@ -300,14 +328,20 @@ entity_key_serialization_version: 2
                     else timedelta(days=1)
                 ),
                 online=False,  # Disabled: Using offline store only
-                description=request.description,
-                tags=request.tags,
+                description=request.description or "",  # Default to empty string if None
+                tags=request.tags or {},  # Default to empty dict if None
             )
 
             # Register with Feast
             if self.store:
-                self.store.apply([feature_view, *entity_objects])
-                print(f"✅ Registered feature view '{request.name}' with Feast")
+                if self.test_mode:
+                    # Test mode: Skip schema inference to avoid S3 access
+                    print(f"⚠️  TEST MODE: Skipping Feast registration (would require S3 access)")
+                    print(f"✅ Feature view '{request.name}' created (test mode)")
+                else:
+                    # Production: Register with full schema inference
+                    self.store.apply([feature_view])  # Entities already registered above
+                    print(f"✅ Registered feature view '{request.name}' with Feast")
 
             # Store in memory
             self.feature_views[request.name] = {
@@ -328,6 +362,10 @@ entity_key_serialization_version: 2
             )
 
         except Exception as e:
+            import traceback
+
+            print(f"❌ Error creating feature view: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to create feature view: {str(e)}",
