@@ -5,21 +5,24 @@
 The Docker build was failing with errors when trying to install Python packages that require C compilation:
 
 ### Error 1: httptools
+
 ```
 error: command 'cc' failed: No such file or directory
 help: `httptools` (v0.6.4) was included because `asgard` depends on `uvicorn[standard]`
 ```
 
 ### Error 2: cffi/cryptography
+
 ```
 fatal error: ffi.h: No such file or directory
-help: `cffi` was included because `asgard` depends on `python-jose[cryptography]` 
+help: `cffi` was included because `asgard` depends on `python-jose[cryptography]`
       which depends on `cryptography` which depends on `cffi`
 ```
 
 ## 🔍 Root Cause
 
 The `python:3.10-slim` base image is minimal and doesn't include:
+
 - C/C++ compilers (`gcc`, `g++`, `make`)
 - Development headers for system libraries (`libffi-dev`, `libssl-dev`)
 
@@ -28,6 +31,7 @@ Python packages with C extensions need these to compile during installation.
 ## ✅ Solution
 
 ### Build-time Dependencies (needed for compilation):
+
 ```dockerfile
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -40,6 +44,7 @@ RUN apt-get update && \
 ```
 
 ### Runtime Dependencies (needed after compilation):
+
 ```dockerfile
 RUN apt-get install -y --no-install-recommends \
         libffi8       # FFI runtime library
@@ -47,6 +52,7 @@ RUN apt-get install -y --no-install-recommends \
 ```
 
 ### Cleanup (keep image small):
+
 ```dockerfile
 RUN apt-get purge -y --auto-remove \
         gcc g++ make libffi-dev libssl-dev python3-dev
@@ -54,11 +60,11 @@ RUN apt-get purge -y --auto-remove \
 
 ## 📦 Affected Packages
 
-| Package | Dependency Chain | Requires |
-|---------|-----------------|----------|
-| `httptools` | uvicorn[standard] → httptools | gcc, g++ |
-| `cffi` | python-jose[cryptography] → cryptography → cffi | gcc, libffi-dev |
-| `cryptography` | python-jose[cryptography] → cryptography | gcc, libssl-dev |
+| Package        | Dependency Chain                                | Requires        |
+| -------------- | ----------------------------------------------- | --------------- |
+| `httptools`    | uvicorn[standard] → httptools                   | gcc, g++        |
+| `cffi`         | python-jose[cryptography] → cryptography → cffi | gcc, libffi-dev |
+| `cryptography` | python-jose[cryptography] → cryptography        | gcc, libssl-dev |
 
 ## 🏗️ Updated Dockerfile Flow
 
@@ -75,7 +81,7 @@ RUN apt-get purge -y --auto-remove \
 ✅ All C extensions compile successfully  
 ✅ Runtime libraries preserved  
 ✅ Build tools removed for smaller image  
-✅ Image size optimized  
+✅ Image size optimized
 
 ## 🚀 Build Command
 
