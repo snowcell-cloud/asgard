@@ -24,9 +24,15 @@ FROM python:3.10-slim AS production
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-# Install build dependencies for C extensions (httptools, etc.)
+# Install build dependencies for C extensions (httptools, cffi/cryptography, etc.)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc g++ make && \
+    apt-get install -y --no-install-recommends \
+        gcc \
+        g++ \
+        make \
+        libffi-dev \
+        libssl-dev \
+        python3-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Create non-root user first
@@ -60,9 +66,11 @@ ENV MODEL_STORAGE_PATH=/tmp/models
 # Install dependencies with uv sync (production only)
 RUN uv sync --frozen --no-dev
 
-# Remove build dependencies to reduce image size
+# Remove build-only dependencies but keep runtime libraries
 USER root
-RUN apt-get purge -y --auto-remove gcc g++ make && \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libffi8 libssl3 && \
+    apt-get purge -y --auto-remove gcc g++ make libffi-dev libssl-dev python3-dev && \
     rm -rf /var/lib/apt/lists/*
 USER app
 
