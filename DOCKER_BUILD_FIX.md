@@ -19,11 +19,19 @@ help: `cffi` was included because `asgard` depends on `python-jose[cryptography]
       which depends on `cryptography` which depends on `cffi`
 ```
 
+### Error 3: pyarrow
+
+```
+error: command 'cmake' failed: No such file or directory
+help: `pyarrow` (v17.0.0) was included because `asgard` depends on `pyarrow`
+```
+
 ## 🔍 Root Cause
 
 The `python:3.10-slim` base image is minimal and doesn't include:
 
 - C/C++ compilers (`gcc`, `g++`, `make`)
+- CMake build system (`cmake`)
 - Development headers for system libraries (`libffi-dev`, `libssl-dev`)
 
 Python packages with C extensions need these to compile during installation.
@@ -38,6 +46,7 @@ RUN apt-get update && \
         gcc           # C compiler
         g++           # C++ compiler
         make          # Build tool
+        cmake         # CMake build system (for pyarrow)
         libffi-dev    # Foreign Function Interface headers (for cffi)
         libssl-dev    # OpenSSL headers (for cryptography)
         python3-dev   # Python development headers
@@ -55,7 +64,7 @@ RUN apt-get install -y --no-install-recommends \
 
 ```dockerfile
 RUN apt-get purge -y --auto-remove \
-        gcc g++ make libffi-dev libssl-dev python3-dev
+        gcc g++ make cmake libffi-dev libssl-dev python3-dev
 ```
 
 ## 📦 Affected Packages
@@ -65,14 +74,15 @@ RUN apt-get purge -y --auto-remove \
 | `httptools`    | uvicorn[standard] → httptools                   | gcc, g++        |
 | `cffi`         | python-jose[cryptography] → cryptography → cffi | gcc, libffi-dev |
 | `cryptography` | python-jose[cryptography] → cryptography        | gcc, libssl-dev |
+| `pyarrow`      | asgard → pyarrow                                | gcc, g++, cmake |
 
 ## 🏗️ Updated Dockerfile Flow
 
 ```
-1. Install build dependencies (gcc, libffi-dev, libssl-dev, etc.)
+1. Install build dependencies (gcc, g++, make, cmake, libffi-dev, libssl-dev, etc.)
 2. Install Python packages (compiles C extensions)
 3. Install runtime libraries (libffi8, libssl3)
-4. Remove build dependencies (saves ~200MB)
+4. Remove build dependencies (saves ~300MB)
 5. Keep runtime libraries (required for execution)
 ```
 
