@@ -255,7 +255,6 @@ class SparkApplicationFactory:
             },
         }
 
-
 def get_spark_client() -> SparkApplicationClient:
     """Dependency function to get SparkApplicationClient."""
     namespace = os.getenv("SPARK_NAMESPACE", "asgard")

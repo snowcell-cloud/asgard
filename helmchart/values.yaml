@@ -15,6 +15,20 @@ env:
   SPARK_IMAGE: "637423187518.dkr.ecr.eu-north-1.amazonaws.com/spark-custom:latest"
   SPARK_SERVICE_ACCOUNT: "spark-sa"
   S3_SECRET_NAME: "s3-credentials"
+  # Production data platform services in data-platform namespace
+  TRINO_HOST: "trino.data-platform.svc.cluster.local"
+  TRINO_PORT: "8080"
+  TRINO_USER: "dbt"
+  TRINO_CATALOG: "iceberg"
+  NESSIE_URI: "http://nessie.data-platform.svc.cluster.local:19120/api/v1"
+  NESSIE_REF: "main"
+  NESSIE_AUTH_TYPE: "NONE"
+  SILVER_SCHEMA: "silver"
+  GOLD_SCHEMA: "gold"
+  # Feast feature store configuration
+  FEAST_REPO_PATH: "/tmp/feast_repo"
+  MODEL_STORAGE_PATH: "/tmp/models"
+  DBT_PROJECT_DIR: "/tmp/dbt_projects"
 
 serviceAccount:
   create: true
@@ -30,7 +44,7 @@ service:
       targetPort: 8000
       protocol: TCP
 
-ingress:                                              
+ingress:
   enabled: true
   className: "nginx"
   annotations:
@@ -58,15 +72,30 @@ autoscaling:
 
 resources:
   limits:
+    cpu: 2000m
+    memory: 2000Mi
+  requests:
     cpu: 1000m
     memory: 1000Mi
-  requests:
-    cpu: 500m
-    memory: 512Mi
+
+# Volume configuration for dbt temp storage
+volumes:
+  - name: temp-storage
+    emptyDir: {}
+
+volumeMounts:
+  - name: temp-storage
+    mountPath: /tmp
+
+# Security context
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  runAsNonRoot: true
 
 nodeSelector: {}
 
 tolerations: []
 
 affinity: {}
- 
