@@ -1,0 +1,34 @@
+---
+# MLflow Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mlflow-ingress
+  namespace: asgard
+  labels:
+    app: mlflow
+    component: tracking-server
+  annotations:
+    # Uncomment and configure based on your ingress controller
+    # kubernetes.io/ingress.class: nginx
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+    # nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    # nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    # nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+spec:
+  # Uncomment for TLS
+  # tls:
+  # - hosts:
+  #   - mlflow.asgard.yourdomain.com
+  #   secretName: mlflow-tls-secret
+  rules:
+    - host: mlflow.asgard.local # CHANGE THIS to your actual domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mlflow-service
+                port:
+                  number: 5000
