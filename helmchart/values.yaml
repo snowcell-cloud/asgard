@@ -78,6 +78,7 @@ resources:
     cpu: 1500m
     memory: 2000Mi
 
+
 # Volume configuration for dbt temp storage
 volumes:
   - name: temp-storage
