@@ -15,84 +15,6 @@ from pydantic import BaseModel, Field, validator
 
 
 # ============================================================================
-# Model Training Schemas (/models)
-# ============================================================================
-
-
-class ModelFramework(str, Enum):
-    """Supported ML frameworks."""
-
-    SKLEARN = "sklearn"
-    XGBOOST = "xgboost"
-    LIGHTGBM = "lightgbm"
-    TENSORFLOW = "tensorflow"
-    PYTORCH = "pytorch"
-    CUSTOM = "custom"
-
-
-class ModelType(str, Enum):
-    """Model type classification."""
-
-    CLASSIFICATION = "classification"
-    REGRESSION = "regression"
-    CLUSTERING = "clustering"
-    RANKING = "ranking"
-    CUSTOM = "custom"
-
-
-class TrainingDataSource(BaseModel):
-    """Configuration for training data."""
-
-    feature_service: Optional[str] = Field(None, description="Feast feature service name")
-    feature_views: Optional[List[str]] = Field(None, description="List of Feast feature views")
-    entities: Dict[str, List[Any]] = Field(..., description="Entity values for feature retrieval")
-    target_column: str = Field(..., description="Target variable column name")
-    event_timestamp: Optional[str] = Field(
-        None, description="Event timestamp for point-in-time features"
-    )
-
-
-class ModelHyperparameters(BaseModel):
-    """Model hyperparameters."""
-
-    params: Dict[str, Any] = Field(default_factory=dict, description="Model parameters")
-
-
-class TrainModelRequest(BaseModel):
-    """Request to train a new model."""
-
-    experiment_name: str = Field(..., description="MLflow experiment name")
-    model_name: str = Field(..., description="Model name for registry")
-    framework: ModelFramework = Field(..., description="ML framework to use")
-    model_type: ModelType = Field(..., description="Type of ML model")
-    data_source: TrainingDataSource = Field(..., description="Training data configuration")
-    hyperparameters: ModelHyperparameters = Field(
-        default_factory=ModelHyperparameters, description="Model hyperparameters"
-    )
-    description: Optional[str] = Field(None, description="Model description")
-    tags: Dict[str, str] = Field(default_factory=dict, description="Model tags")
-
-
-class ModelMetrics(BaseModel):
-    """Model performance metrics."""
-
-    metrics: Dict[str, float] = Field(..., description="Metric name to value mapping")
-
-
-class TrainModelResponse(BaseModel):
-    """Response from model training."""
-
-    run_id: str = Field(..., description="MLflow run ID")
-    experiment_id: str = Field(..., description="MLflow experiment ID")
-    model_name: str = Field(..., description="Model name")
-    model_uri: str = Field(..., description="MLflow model URI")
-    metrics: ModelMetrics = Field(..., description="Training metrics")
-    artifact_uri: str = Field(..., description="S3 artifact location")
-    status: str = Field(..., description="Training status")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-
-
-# ============================================================================
 # Model Registry Schemas (/registry)
 # ============================================================================
 
@@ -141,58 +63,6 @@ class ModelInfo(BaseModel):
 
 
 # ============================================================================
-# Model Serving Schemas (/serve)
-# ============================================================================
-
-
-class PredictionInput(BaseModel):
-    """Input for model predictions."""
-
-    model_name: str = Field(..., description="Model name to use")
-    model_version: Optional[str] = Field(None, description="Model version (default: latest)")
-    entities: Dict[str, List[Any]] = Field(..., description="Entity values for feature retrieval")
-    features: Optional[Dict[str, Any]] = Field(
-        None, description="Direct feature values (bypasses Feast)"
-    )
-    return_features: bool = Field(False, description="Include features in response")
-
-
-class PredictionOutput(BaseModel):
-    """Output from model predictions."""
-
-    predictions: List[Any] = Field(..., description="Model predictions")
-    model_name: str
-    model_version: str
-    run_id: str
-    features: Optional[Dict[str, List[Any]]] = Field(
-        None, description="Features used (if requested)"
-    )
-    prediction_time: datetime = Field(default_factory=datetime.utcnow)
-
-
-class BatchPredictionRequest(BaseModel):
-    """Request for batch predictions."""
-
-    model_name: str = Field(..., description="Model name")
-    model_version: Optional[str] = Field(None, description="Model version")
-    feature_service: Optional[str] = Field(None, description="Feast feature service")
-    feature_views: Optional[List[str]] = Field(None, description="Feast feature views")
-    entities_df: Dict[str, List[Any]] = Field(..., description="DataFrame of entities as dict")
-    output_path: Optional[str] = Field(None, description="S3 path for output")
-
-
-class BatchPredictionResponse(BaseModel):
-    """Response from batch predictions."""
-
-    job_id: str = Field(..., description="Batch job identifier")
-    model_name: str
-    model_version: str
-    status: str = Field(default="submitted", description="Job status")
-    output_path: Optional[str] = Field(None, description="S3 output location")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-
-
-# ============================================================================
 # Health and Status Schemas
 # ============================================================================
 
@@ -210,63 +80,83 @@ class MLOpsStatus(BaseModel):
 
 
 # ============================================================================
-# Model Monitoring Schemas
+# Script-based Training Schemas (/training/upload)
 # ============================================================================
 
 
-class MonitoringMetricType(str, Enum):
-    """Types of monitoring metrics."""
+class TrainingScriptUploadRequest(BaseModel):
+    """Request to upload and execute a training script."""
 
-    PREDICTION_DRIFT = "prediction_drift"
-    FEATURE_DRIFT = "feature_drift"
-    DATA_QUALITY = "data_quality"
-    MODEL_PERFORMANCE = "model_performance"
-    CUSTOM = "custom"
+    script_name: str = Field(..., description="Name for the training script")
+    script_content: str = Field(..., description="Python script content (base64 encoded)")
+    experiment_name: str = Field(..., description="MLflow experiment name")
+    model_name: str = Field(..., description="Model name for registration")
+    requirements: Optional[List[str]] = Field(
+        default_factory=list, description="Additional pip packages required"
+    )
+    environment_vars: Dict[str, str] = Field(
+        default_factory=dict, description="Environment variables for script execution"
+    )
+    timeout: int = Field(300, description="Execution timeout in seconds", ge=60, le=3600)
+    tags: Dict[str, str] = Field(default_factory=dict, description="Tags for the training run")
 
 
-class MonitoringRequest(BaseModel):
-    """Request to log monitoring metrics."""
+class TrainingScriptUploadResponse(BaseModel):
+    """Response from script upload and execution."""
+
+    job_id: str = Field(..., description="Training job identifier")
+    script_name: str
+    experiment_name: str
+    model_name: str
+    status: str = Field(..., description="Job status: queued, running, completed, failed")
+    run_id: Optional[str] = Field(None, description="MLflow run ID (when completed)")
+    model_version: Optional[str] = Field(None, description="Registered model version")
+    error: Optional[str] = Field(None, description="Error message if failed")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+
+class TrainingJobStatus(BaseModel):
+    """Status of a training job."""
+
+    job_id: str
+    script_name: str
+    experiment_name: str
+    model_name: str
+    status: str
+    run_id: Optional[str] = None
+    model_version: Optional[str] = None
+    logs: Optional[str] = Field(None, description="Training logs")
+    error: Optional[str] = None
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    duration_seconds: Optional[float] = None
+
+
+# ============================================================================
+# Model Inference Schemas (/inference)
+# ============================================================================
+
+
+class InferenceRequest(BaseModel):
+    """Request for model inference."""
 
     model_name: str = Field(..., description="Model name")
-    model_version: str = Field(..., description="Model version")
-    metric_type: MonitoringMetricType = Field(..., description="Type of monitoring metric")
-    metrics: Dict[str, float] = Field(..., description="Monitoring metrics")
-    reference_data: Optional[Dict[str, Any]] = Field(
-        None, description="Reference data for comparison"
-    )
-    current_data: Optional[Dict[str, Any]] = Field(None, description="Current data being monitored")
-    tags: Dict[str, str] = Field(default_factory=dict, description="Additional tags")
+    model_version: Optional[str] = Field(None, description="Model version (default: latest)")
+    inputs: Dict[str, List[Any]] = Field(..., description="Input data as dict of features")
+    return_probabilities: bool = Field(False, description="Return prediction probabilities")
 
 
-class MonitoringResponse(BaseModel):
-    """Response from monitoring logging."""
+class InferenceResponse(BaseModel):
+    """Response from model inference."""
 
-    monitoring_id: str = Field(..., description="Monitoring entry ID")
     model_name: str
     model_version: str
-    metric_type: str
-    metrics: Dict[str, float]
-    alert_triggered: bool = Field(default=False, description="Whether alerts were triggered")
-    alerts: List[str] = Field(default_factory=list, description="List of alerts")
+    predictions: List[Any] = Field(..., description="Model predictions")
+    probabilities: Optional[List[List[float]]] = Field(
+        None, description="Prediction probabilities (if requested)"
+    )
+    inference_time_ms: float = Field(..., description="Inference time in milliseconds")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-
-
-class MonitoringHistoryRequest(BaseModel):
-    """Request to get monitoring history."""
-
-    model_name: str = Field(..., description="Model name")
-    model_version: Optional[str] = Field(None, description="Model version (optional)")
-    metric_type: Optional[MonitoringMetricType] = Field(None, description="Filter by metric type")
-    start_date: Optional[datetime] = Field(None, description="Start date for history")
-    end_date: Optional[datetime] = Field(None, description="End date for history")
-    limit: int = Field(100, description="Maximum number of records", ge=1, le=1000)
-
-
-class MonitoringHistoryResponse(BaseModel):
-    """Response with monitoring history."""
-
-    model_name: str
-    model_version: Optional[str]
-    total_records: int
-    records: List[MonitoringResponse]
-    summary: Dict[str, Any] = Field(default_factory=dict, description="Summary statistics")

@@ -1,42 +1,41 @@
 """
 MLOps Service for ML lifecycle management.
 
-Integrates Feast feature store with MLflow for:
-- Model training with feature engineering
-- Model registry and versioning
-- Model serving and predictions
+Simplified service for script-based training and model serving:
+- Upload and execute Python training scripts
+- Register models to MLflow
+- Serve models for inference
+- Track training job status
 """
 
 import os
-import pickle
 import uuid
+import base64
+import subprocess
+import tempfile
+import time
+import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import mlflow
-import mlflow.sklearn
-import mlflow.xgboost
-import mlflow.lightgbm
 import pandas as pd
+import numpy as np
 from fastapi import HTTPException
 from mlflow.tracking import MlflowClient
 
 from app.feast.service import FeatureStoreService
 from app.mlops.schemas import (
-    BatchPredictionRequest,
-    BatchPredictionResponse,
-    ModelFramework,
+    InferenceRequest,
+    InferenceResponse,
     ModelInfo,
-    ModelMetrics,
-    ModelType,
     ModelVersionInfo,
-    PredictionInput,
-    PredictionOutput,
     RegisterModelRequest,
     RegisterModelResponse,
-    TrainModelRequest,
-    TrainModelResponse,
+    TrainingJobStatus,
+    TrainingScriptUploadRequest,
+    TrainingScriptUploadResponse,
     MLOpsStatus,
 )
 
@@ -61,189 +60,13 @@ class MLOpsService:
         # Model cache for serving
         self.model_cache: Dict[str, Any] = {}
 
-        # Monitoring storage (in-memory for now, can be moved to DB)
-        self.monitoring_data: Dict[str, List[Dict[str, Any]]] = {}
+        # Training jobs storage (in-memory for now)
+        self.training_jobs: Dict[str, Dict[str, Any]] = {}
+        self.training_jobs_lock = threading.Lock()
 
         print(f"✅ MLOpsService initialized")
         print(f"   MLflow: {self.mlflow_tracking_uri}")
         print(f"   Feast repo: {self.feast_service.feast_repo_path}")
-
-    # ========================================================================
-    # Model Training (/models)
-    # ========================================================================
-
-    async def train_model(self, request: TrainModelRequest) -> TrainModelResponse:
-        """
-        Train a model using Feast features.
-
-        Steps:
-        1. Retrieve features from Feast
-        2. Train model with specified framework
-        3. Log to MLflow with metrics and artifacts
-        4. Return training results
-        """
-        try:
-            # Set or create experiment
-            experiment = mlflow.get_experiment_by_name(request.experiment_name)
-            if experiment is None:
-                experiment_id = mlflow.create_experiment(request.experiment_name)
-            else:
-                experiment_id = experiment.experiment_id
-
-            # Start MLflow run
-            with mlflow.start_run(experiment_id=experiment_id) as run:
-                # Log parameters
-                mlflow.log_params(request.hyperparameters.params)
-                mlflow.set_tags(request.tags)
-                mlflow.set_tag("framework", request.framework.value)
-                mlflow.set_tag("model_type", request.model_type.value)
-
-                # Get training data from Feast
-                X_train, y_train = await self._get_training_data(request.data_source)
-
-                # Train model based on framework
-                model, metrics = await self._train_model_by_framework(
-                    request.framework,
-                    request.model_type,
-                    X_train,
-                    y_train,
-                    request.hyperparameters.params,
-                )
-
-                # Log metrics
-                mlflow.log_metrics(metrics.metrics)
-
-                # Log model
-                model_uri = await self._log_model(model, request.framework)
-
-                return TrainModelResponse(
-                    run_id=run.info.run_id,
-                    experiment_id=experiment_id,
-                    model_name=request.model_name,
-                    model_uri=model_uri,
-                    metrics=metrics,
-                    artifact_uri=run.info.artifact_uri,
-                    status="completed",
-                    created_at=datetime.utcnow(),
-                )
-
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Model training failed: {str(e)}")
-
-    async def _get_training_data(self, data_source) -> Tuple[pd.DataFrame, pd.Series]:
-        """Retrieve training data from Feast."""
-        try:
-            # Convert entities dict to DataFrame
-            entities_df = pd.DataFrame(data_source.entities)
-
-            # Get features from Feast
-            if data_source.feature_service:
-                # Use feature service
-                feature_vector = self.feast_service.store.get_historical_features(
-                    entity_df=entities_df, features=[data_source.feature_service]
-                ).to_df()
-            elif data_source.feature_views:
-                # Use feature views
-                features = [
-                    f"{fv}:*" for fv in data_source.feature_views
-                ]  # Get all features from views
-                feature_vector = self.feast_service.store.get_historical_features(
-                    entity_df=entities_df, features=features
-                ).to_df()
-            else:
-                raise ValueError("Either feature_service or feature_views must be provided")
-
-            # Separate features and target
-            y_train = feature_vector[data_source.target_column]
-            X_train = feature_vector.drop(columns=[data_source.target_column])
-
-            return X_train, y_train
-
-        except Exception as e:
-            raise HTTPException(
-                status_code=500, detail=f"Failed to retrieve training data: {str(e)}"
-            )
-
-    async def _train_model_by_framework(
-        self,
-        framework: ModelFramework,
-        model_type: ModelType,
-        X_train: pd.DataFrame,
-        y_train: pd.Series,
-        params: Dict[str, Any],
-    ) -> Tuple[Any, ModelMetrics]:
-        """Train model based on specified framework."""
-        metrics = {}
-
-        if framework == ModelFramework.SKLEARN:
-            from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-            from sklearn.metrics import accuracy_score, mean_squared_error, r2_score
-
-            if model_type == ModelType.CLASSIFICATION:
-                model = RandomForestClassifier(**params)
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_train)
-                metrics["train_accuracy"] = accuracy_score(y_train, y_pred)
-            else:  # REGRESSION
-                model = RandomForestRegressor(**params)
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_train)
-                metrics["train_rmse"] = mean_squared_error(y_train, y_pred, squared=False)
-                metrics["train_r2"] = r2_score(y_train, y_pred)
-
-        elif framework == ModelFramework.XGBOOST:
-            import xgboost as xgb
-            from sklearn.metrics import accuracy_score, mean_squared_error, r2_score
-
-            if model_type == ModelType.CLASSIFICATION:
-                model = xgb.XGBClassifier(**params)
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_train)
-                metrics["train_accuracy"] = accuracy_score(y_train, y_pred)
-            else:
-                model = xgb.XGBRegressor(**params)
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_train)
-                metrics["train_rmse"] = mean_squared_error(y_train, y_pred, squared=False)
-                metrics["train_r2"] = r2_score(y_train, y_pred)
-
-        elif framework == ModelFramework.LIGHTGBM:
-            import lightgbm as lgb
-            from sklearn.metrics import accuracy_score, mean_squared_error, r2_score
-
-            if model_type == ModelType.CLASSIFICATION:
-                model = lgb.LGBMClassifier(**params)
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_train)
-                metrics["train_accuracy"] = accuracy_score(y_train, y_pred)
-            else:
-                model = lgb.LGBMRegressor(**params)
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_train)
-                metrics["train_rmse"] = mean_squared_error(y_train, y_pred, squared=False)
-                metrics["train_r2"] = r2_score(y_train, y_pred)
-
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Framework {framework} not implemented. Use sklearn, xgboost, or lightgbm.",
-            )
-
-        return model, ModelMetrics(metrics=metrics)
-
-    async def _log_model(self, model: Any, framework: ModelFramework) -> str:
-        """Log model to MLflow."""
-        if framework == ModelFramework.SKLEARN:
-            mlflow.sklearn.log_model(model, "model")
-        elif framework == ModelFramework.XGBOOST:
-            mlflow.xgboost.log_model(model, "model")
-        elif framework == ModelFramework.LIGHTGBM:
-            mlflow.lightgbm.log_model(model, "model")
-        else:
-            # Fallback to pickle
-            mlflow.log_artifact(pickle.dumps(model), "model.pkl")
-
-        return f"runs:/{mlflow.active_run().info.run_id}/model"
 
     # ========================================================================
     # Model Registry (/registry)
@@ -324,143 +147,6 @@ class MLOpsService:
             raise HTTPException(status_code=500, detail=f"Failed to list models: {str(e)}")
 
     # ========================================================================
-    # Model Serving (/serve)
-    # ========================================================================
-
-    async def predict(self, request: PredictionInput) -> PredictionOutput:
-        """Make predictions using a registered model."""
-        try:
-            # Load model
-            model, model_version, run_id = await self._load_model(
-                request.model_name, request.model_version
-            )
-
-            # Get features
-            if request.features:
-                # Direct features provided
-                X = pd.DataFrame([request.features])
-            else:
-                # Retrieve from Feast
-                entities_df = pd.DataFrame(request.entities)
-                feature_vector = self.feast_service.store.get_online_features(
-                    entity_rows=entities_df.to_dict("records"),
-                    features=["*"],  # Get all features
-                ).to_df()
-                X = feature_vector
-
-            # Make predictions
-            predictions = model.predict(X)
-
-            response = PredictionOutput(
-                predictions=predictions.tolist(),
-                model_name=request.model_name,
-                model_version=model_version,
-                run_id=run_id,
-                prediction_time=datetime.utcnow(),
-            )
-
-            if request.return_features:
-                response.features = X.to_dict("list")
-
-            return response
-
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
-
-    async def batch_predict(self, request: BatchPredictionRequest) -> BatchPredictionResponse:
-        """Make batch predictions."""
-        try:
-            job_id = str(uuid.uuid4())
-
-            # Load model
-            model, model_version, run_id = await self._load_model(
-                request.model_name, request.model_version
-            )
-
-            # Get features from Feast
-            entities_df = pd.DataFrame(request.entities_df)
-
-            if request.feature_service:
-                feature_vector = self.feast_service.store.get_historical_features(
-                    entity_df=entities_df, features=[request.feature_service]
-                ).to_df()
-            elif request.feature_views:
-                features = [f"{fv}:*" for fv in request.feature_views]
-                feature_vector = self.feast_service.store.get_historical_features(
-                    entity_df=entities_df, features=features
-                ).to_df()
-            else:
-                raise ValueError("Either feature_service or feature_views required")
-
-            # Make predictions
-            predictions = model.predict(feature_vector)
-
-            # Add predictions to DataFrame
-            result_df = feature_vector.copy()
-            result_df["prediction"] = predictions
-
-            # Save to S3 if output path provided
-            output_path = request.output_path
-            if output_path:
-                result_df.to_parquet(output_path, index=False)
-            else:
-                output_path = f"s3://{self.feast_service.s3_bucket}/predictions/{job_id}.parquet"
-                result_df.to_parquet(output_path, index=False)
-
-            return BatchPredictionResponse(
-                job_id=job_id,
-                model_name=request.model_name,
-                model_version=model_version,
-                status="completed",
-                output_path=output_path,
-                created_at=datetime.utcnow(),
-            )
-
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Batch prediction failed: {str(e)}")
-
-    async def _load_model(
-        self,
-        model_name: str,
-        version: Optional[str] = None,
-    ) -> Tuple[Any, str, str]:
-        """Load model from MLflow by name and version."""
-        # Generate cache key
-        cache_key = f"{model_name}:{version or 'latest'}"
-
-        # Check cache
-        if cache_key in self.model_cache:
-            return self.model_cache[cache_key]
-
-        # Determine model URI
-        if version:
-            model_uri = f"models:/{model_name}/{version}"
-        else:
-            model_uri = f"models:/{model_name}/latest"
-
-        # Load model
-        model = mlflow.pyfunc.load_model(model_uri)
-
-        # Get model version info
-        if version:
-            version_info = self.mlflow_client.get_model_version(model_name, version)
-        else:
-            # Get latest version
-            versions = self.mlflow_client.search_model_versions(f"name='{model_name}'")
-            version_info = versions[0] if versions else None
-
-        if not version_info:
-            raise HTTPException(status_code=404, detail=f"Model {model_name} not found")
-
-        model_version = version_info.version
-        run_id = version_info.run_id
-
-        # Cache model
-        self.model_cache[cache_key] = (model, model_version, run_id)
-
-        return model, model_version, run_id
-
-    # ========================================================================
     # Status and Health
     # ========================================================================
 
@@ -506,146 +192,308 @@ class MLOpsService:
             raise HTTPException(status_code=500, detail=f"Status check failed: {str(e)}")
 
     # ========================================================================
-    # Model Monitoring
+    # Script-based Training (/training/upload)
     # ========================================================================
 
-    async def log_monitoring_metrics(self, request):
-        """Log monitoring metrics for a model."""
+    async def upload_and_execute_script(
+        self, request: TrainingScriptUploadRequest
+    ) -> TrainingScriptUploadResponse:
+        """
+        Upload and execute a Python training script.
+
+        The script must:
+        1. Use mlflow.start_run() to log experiments
+        2. Call mlflow.log_model() to register the trained model
+        3. Optionally use provided environment variables
+        """
         try:
-            from app.mlops.schemas import MonitoringResponse
+            # Generate job ID
+            job_id = str(uuid.uuid4())[:8]
 
-            monitoring_id = str(uuid.uuid4())
+            # Decode script content (assuming base64 encoded)
+            try:
+                script_bytes = base64.b64decode(request.script_content)
+                script_text = script_bytes.decode("utf-8")
+            except Exception:
+                # If not base64, treat as plain text
+                script_text = request.script_content
 
-            # Calculate alerts based on thresholds
-            alerts = []
-            alert_triggered = False
-
-            # Check for drift alerts (simple threshold-based)
-            if request.metric_type.value in ["prediction_drift", "feature_drift"]:
-                for metric_name, value in request.metrics.items():
-                    if value > 0.1:  # 10% drift threshold
-                        alerts.append(f"{metric_name} drift detected: {value:.3f}")
-                        alert_triggered = True
-
-            # Check for data quality alerts
-            if request.metric_type.value == "data_quality":
-                for metric_name, value in request.metrics.items():
-                    if "missing" in metric_name and value > 0.05:  # 5% missing threshold
-                        alerts.append(f"High missing rate in {metric_name}: {value:.3f}")
-                        alert_triggered = True
-
-            # Check for performance degradation
-            if request.metric_type.value == "model_performance":
-                for metric_name, value in request.metrics.items():
-                    if "accuracy" in metric_name and value < 0.7:  # 70% threshold
-                        alerts.append(f"Low {metric_name}: {value:.3f}")
-                        alert_triggered = True
-
-            # Store monitoring data
-            model_key = f"{request.model_name}:{request.model_version}"
-            if model_key not in self.monitoring_data:
-                self.monitoring_data[model_key] = []
-
-            monitoring_entry = {
-                "monitoring_id": monitoring_id,
+            # Store job info
+            job_info = {
+                "job_id": job_id,
+                "script_name": request.script_name,
+                "experiment_name": request.experiment_name,
                 "model_name": request.model_name,
-                "model_version": request.model_version,
-                "metric_type": request.metric_type.value,
-                "metrics": request.metrics,
-                "reference_data": request.reference_data,
-                "current_data": request.current_data,
-                "tags": request.tags,
-                "alert_triggered": alert_triggered,
-                "alerts": alerts,
-                "timestamp": datetime.utcnow(),
+                "status": "queued",
+                "run_id": None,
+                "model_version": None,
+                "error": None,
+                "created_at": datetime.utcnow(),
+                "started_at": None,
+                "completed_at": None,
+                "logs": "",
             }
 
-            self.monitoring_data[model_key].append(monitoring_entry)
+            with self.training_jobs_lock:
+                self.training_jobs[job_id] = job_info
 
-            # Also log to MLflow if available
-            try:
-                with mlflow.start_run(run_name=f"monitoring_{monitoring_id}"):
-                    mlflow.set_tag("model_name", request.model_name)
-                    mlflow.set_tag("model_version", request.model_version)
-                    mlflow.set_tag("metric_type", request.metric_type.value)
-                    mlflow.log_metrics(request.metrics)
-                    if alert_triggered:
-                        mlflow.set_tag("alert_triggered", "true")
-                        mlflow.set_tag("alerts", "; ".join(alerts))
-            except Exception as e:
-                print(f"Warning: Could not log to MLflow: {str(e)}")
+            # Execute script in background thread
+            thread = threading.Thread(
+                target=self._execute_training_script,
+                args=(
+                    job_id,
+                    script_text,
+                    request.experiment_name,
+                    request.model_name,
+                    request.requirements,
+                    request.environment_vars,
+                    request.timeout,
+                    request.tags,
+                ),
+            )
+            thread.daemon = True
+            thread.start()
 
-            return MonitoringResponse(
-                monitoring_id=monitoring_id,
+            return TrainingScriptUploadResponse(
+                job_id=job_id,
+                script_name=request.script_name,
+                experiment_name=request.experiment_name,
                 model_name=request.model_name,
-                model_version=request.model_version,
-                metric_type=request.metric_type.value,
-                metrics=request.metrics,
-                alert_triggered=alert_triggered,
-                alerts=alerts,
+                status="queued",
+                created_at=datetime.utcnow(),
+            )
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to upload script: {str(e)}")
+
+    def _execute_training_script(
+        self,
+        job_id: str,
+        script_text: str,
+        experiment_name: str,
+        model_name: str,
+        requirements: List[str],
+        environment_vars: Dict[str, str],
+        timeout: int,
+        tags: Dict[str, str],
+    ):
+        """Execute training script in isolated environment."""
+        try:
+            # Update status to running
+            with self.training_jobs_lock:
+                self.training_jobs[job_id]["status"] = "running"
+                self.training_jobs[job_id]["started_at"] = datetime.utcnow()
+
+            # Create temporary directory for script execution
+            with tempfile.TemporaryDirectory() as tmpdir:
+                script_path = Path(tmpdir) / "train.py"
+
+                # Inject MLflow configuration into script
+                injected_script = f"""
+import os
+import sys
+import mlflow
+
+# MLflow configuration
+os.environ['MLFLOW_TRACKING_URI'] = '{self.mlflow_tracking_uri}'
+mlflow.set_tracking_uri('{self.mlflow_tracking_uri}')
+mlflow.set_experiment('{experiment_name}')
+
+# User-provided environment variables
+"""
+                for key, value in environment_vars.items():
+                    injected_script += f"os.environ['{key}'] = '{value}'\n"
+
+                injected_script += "\n# User script\n" + script_text
+
+                # Write script to file
+                script_path.write_text(injected_script)
+
+                # Install requirements if specified
+                logs = ""
+                if requirements:
+                    logs += "Installing requirements...\n"
+                    try:
+                        result = subprocess.run(
+                            [
+                                "pip",
+                                "install",
+                                "--quiet",
+                                "--no-cache-dir",
+                            ]
+                            + requirements,
+                            capture_output=True,
+                            text=True,
+                            timeout=120,
+                            cwd=tmpdir,
+                        )
+                        logs += result.stdout + result.stderr
+                    except subprocess.TimeoutExpired:
+                        logs += "Requirements installation timed out\n"
+
+                # Execute the script
+                logs += "\nExecuting training script...\n"
+                try:
+                    env = os.environ.copy()
+                    env["MLFLOW_TRACKING_URI"] = self.mlflow_tracking_uri
+                    env.update(environment_vars)
+
+                    result = subprocess.run(
+                        ["python", str(script_path)],
+                        capture_output=True,
+                        text=True,
+                        timeout=timeout,
+                        cwd=tmpdir,
+                        env=env,
+                    )
+
+                    logs += result.stdout
+                    if result.stderr:
+                        logs += "\nStderr:\n" + result.stderr
+
+                    # Check if execution was successful
+                    if result.returncode == 0:
+                        # Try to get the latest run from the experiment
+                        experiment = mlflow.get_experiment_by_name(experiment_name)
+                        if experiment:
+                            runs = mlflow.search_runs(
+                                experiment_ids=[experiment.experiment_id],
+                                order_by=["start_time DESC"],
+                                max_results=1,
+                            )
+
+                            if not runs.empty:
+                                run_id = runs.iloc[0]["run_id"]
+
+                                # Try to register the model
+                                try:
+                                    model_uri = f"runs:/{run_id}/model"
+                                    result = mlflow.register_model(model_uri, model_name)
+                                    model_version = result.version
+
+                                    with self.training_jobs_lock:
+                                        self.training_jobs[job_id]["run_id"] = run_id
+                                        self.training_jobs[job_id]["model_version"] = model_version
+                                        self.training_jobs[job_id]["status"] = "completed"
+                                        self.training_jobs[job_id]["logs"] = logs
+                                        self.training_jobs[job_id][
+                                            "completed_at"
+                                        ] = datetime.utcnow()
+                                except Exception as reg_error:
+                                    logs += f"\nModel registration failed: {str(reg_error)}\n"
+                                    with self.training_jobs_lock:
+                                        self.training_jobs[job_id]["run_id"] = run_id
+                                        self.training_jobs[job_id]["status"] = "completed"
+                                        self.training_jobs[job_id]["logs"] = logs
+                                        self.training_jobs[job_id][
+                                            "completed_at"
+                                        ] = datetime.utcnow()
+                            else:
+                                logs += "\nNo runs found in experiment\n"
+                                with self.training_jobs_lock:
+                                    self.training_jobs[job_id]["status"] = "failed"
+                                    self.training_jobs[job_id]["error"] = "No MLflow run created"
+                                    self.training_jobs[job_id]["logs"] = logs
+                                    self.training_jobs[job_id]["completed_at"] = datetime.utcnow()
+                    else:
+                        with self.training_jobs_lock:
+                            self.training_jobs[job_id]["status"] = "failed"
+                            self.training_jobs[job_id][
+                                "error"
+                            ] = f"Script exited with code {result.returncode}"
+                            self.training_jobs[job_id]["logs"] = logs
+                            self.training_jobs[job_id]["completed_at"] = datetime.utcnow()
+
+                except subprocess.TimeoutExpired:
+                    logs += f"\nScript execution timed out after {timeout} seconds\n"
+                    with self.training_jobs_lock:
+                        self.training_jobs[job_id]["status"] = "failed"
+                        self.training_jobs[job_id]["error"] = "Execution timeout"
+                        self.training_jobs[job_id]["logs"] = logs
+                        self.training_jobs[job_id]["completed_at"] = datetime.utcnow()
+
+        except Exception as e:
+            with self.training_jobs_lock:
+                self.training_jobs[job_id]["status"] = "failed"
+                self.training_jobs[job_id]["error"] = str(e)
+                self.training_jobs[job_id]["completed_at"] = datetime.utcnow()
+
+    async def get_training_job_status(self, job_id: str) -> TrainingJobStatus:
+        """Get status of a training job."""
+        with self.training_jobs_lock:
+            if job_id not in self.training_jobs:
+                raise HTTPException(status_code=404, detail=f"Training job {job_id} not found")
+
+            job = self.training_jobs[job_id]
+
+            # Calculate duration if completed
+            duration_seconds = None
+            if job["completed_at"] and job["started_at"]:
+                duration_seconds = (job["completed_at"] - job["started_at"]).total_seconds()
+
+            return TrainingJobStatus(
+                job_id=job["job_id"],
+                script_name=job["script_name"],
+                experiment_name=job["experiment_name"],
+                model_name=job["model_name"],
+                status=job["status"],
+                run_id=job["run_id"],
+                model_version=job["model_version"],
+                logs=job.get("logs"),
+                error=job["error"],
+                created_at=job["created_at"],
+                started_at=job["started_at"],
+                completed_at=job["completed_at"],
+                duration_seconds=duration_seconds,
+            )
+
+    # ========================================================================
+    # Model Inference (/inference)
+    # ========================================================================
+
+    async def inference(self, request: InferenceRequest) -> InferenceResponse:
+        """
+        Run inference on a deployed model.
+
+        This is a simplified inference endpoint that loads the model
+        and makes predictions on the provided input data.
+        """
+        try:
+            start_time = time.time()
+
+            # Load model
+            model, model_version, run_id = await self._load_model(
+                request.model_name, request.model_version
+            )
+
+            # Prepare input data
+            X = pd.DataFrame(request.inputs)
+
+            # Make predictions
+            predictions = model.predict(X)
+
+            # Get probabilities if requested and model supports it
+            probabilities = None
+            if request.return_probabilities:
+                try:
+                    if hasattr(model, "predict_proba"):
+                        probabilities = model.predict_proba(X).tolist()
+                except Exception:
+                    pass  # Model doesn't support probabilities
+
+            # Calculate inference time
+            inference_time_ms = (time.time() - start_time) * 1000
+
+            return InferenceResponse(
+                model_name=request.model_name,
+                model_version=model_version,
+                predictions=(
+                    predictions.tolist() if hasattr(predictions, "tolist") else list(predictions)
+                ),
+                probabilities=probabilities,
+                inference_time_ms=round(inference_time_ms, 2),
                 timestamp=datetime.utcnow(),
             )
 
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Monitoring logging failed: {str(e)}")
-
-    async def get_monitoring_history(self, request):
-        """Get monitoring history for a model."""
-        try:
-            from app.mlops.schemas import MonitoringHistoryResponse, MonitoringResponse
-
-            model_key = f"{request.model_name}:{request.model_version or '*'}"
-
-            # Get all monitoring data for this model
-            all_records = []
-            for key, records in self.monitoring_data.items():
-                if key.startswith(request.model_name):
-                    if (
-                        request.model_version is None
-                        or key == f"{request.model_name}:{request.model_version}"
-                    ):
-                        all_records.extend(records)
-
-            # Filter by metric type if specified
-            if request.metric_type:
-                all_records = [
-                    r for r in all_records if r["metric_type"] == request.metric_type.value
-                ]
-
-            # Filter by date range if specified
-            if request.start_date:
-                all_records = [r for r in all_records if r["timestamp"] >= request.start_date]
-            if request.end_date:
-                all_records = [r for r in all_records if r["timestamp"] <= request.end_date]
-
-            # Sort by timestamp descending
-            all_records.sort(key=lambda x: x["timestamp"], reverse=True)
-
-            # Apply limit
-            limited_records = all_records[: request.limit]
-
-            # Convert to response objects
-            response_records = [MonitoringResponse(**record) for record in limited_records]
-
-            # Calculate summary statistics
-            summary = {
-                "total_alerts": sum(1 for r in all_records if r["alert_triggered"]),
-                "metric_types": list(set(r["metric_type"] for r in all_records)),
-                "date_range": {
-                    "start": min(r["timestamp"] for r in all_records) if all_records else None,
-                    "end": max(r["timestamp"] for r in all_records) if all_records else None,
-                },
-            }
-
-            return MonitoringHistoryResponse(
-                model_name=request.model_name,
-                model_version=request.model_version,
-                total_records=len(all_records),
-                records=response_records,
-                summary=summary,
-            )
-
-        except Exception as e:
-            raise HTTPException(
-                status_code=500, detail=f"Failed to get monitoring history: {str(e)}"
-            )
+            raise HTTPException(status_code=500, detail=f"Inference failed: {str(e)}")

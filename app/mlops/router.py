@@ -1,19 +1,12 @@
 """
 FastAPI router for MLOps APIs.
 
-Integrates Feast features with MLflow for complete ML lifecycle:
-- /models: Train models with feature engineering
-- /registry: Manage model versions and stages
-- /serve: Make predictions with feature retrieval
-
-Architecture:
-  Iceberg/Trino (Data Layer)
-         ↓
-  Feast (Feature Store)
-         ↓
-  MLflow (Training & Registry)
-         ↓
-  Model Serving (Predictions)
+Simplified API for script-based training and model serving:
+- /training/upload: Upload Python scripts for training
+- /training/jobs/{job_id}: Check training job status
+- /inference: Run predictions on trained models
+- /registry: Register and manage models
+- /models: List registered models
 """
 
 from typing import List, Optional
@@ -21,19 +14,14 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.mlops.schemas import (
-    BatchPredictionRequest,
-    BatchPredictionResponse,
+    InferenceRequest,
+    InferenceResponse,
     ModelInfo,
-    MonitoringRequest,
-    MonitoringResponse,
-    MonitoringHistoryRequest,
-    MonitoringHistoryResponse,
-    PredictionInput,
-    PredictionOutput,
     RegisterModelRequest,
     RegisterModelResponse,
-    TrainModelRequest,
-    TrainModelResponse,
+    TrainingJobStatus,
+    TrainingScriptUploadRequest,
+    TrainingScriptUploadResponse,
     ModelVersionInfo,
     MLOpsStatus,
 )
@@ -54,88 +42,125 @@ def get_service() -> MLOpsService:
 
 
 # ============================================================================
-# Model Training Endpoints (/models)
+# Script-based Training Endpoints (/training)
 # ============================================================================
 
 
-@router.post("/models", response_model=TrainModelResponse, status_code=201)
-async def train_model(
-    request: TrainModelRequest,
+@router.post("/training/upload", response_model=TrainingScriptUploadResponse, status_code=202)
+async def upload_training_script(
+    request: TrainingScriptUploadRequest,
     service: MLOpsService = Depends(get_service),
-) -> TrainModelResponse:
+) -> TrainingScriptUploadResponse:
     """
-    Train a new ML model using Feast features.
+    Upload and execute a Python training script (.py file).
 
     **Workflow:**
-    1. Retrieve features from Feast feature store
-    2. Train model with specified framework (sklearn, xgboost, lightgbm)
-    3. Log experiment, parameters, and metrics to MLflow
-    4. Store model artifacts in S3 via MLflow
+    1. Upload a Python script (base64 encoded or plain text)
+    2. Script is executed in isolated environment with MLflow tracking
+    3. Model is automatically registered to MLflow
+    4. Returns job ID for status tracking
+
+    **Script Requirements:**
+    - Must use `mlflow.start_run()` to create a run
+    - Must call `mlflow.log_model()` to save the trained model
+    - Can use any ML framework (sklearn, xgboost, tensorflow, etc.)
 
     **Example Request:**
     ```json
     {
+      "script_name": "churn_model_training.py",
+      "script_content": "aW1wb3J0IG1sZmxvdw...",
       "experiment_name": "customer_churn",
       "model_name": "churn_predictor",
-      "framework": "sklearn",
-      "model_type": "classification",
-      "data_source": {
-        "feature_views": ["customer_features"],
-        "entities": {"customer_id": [1, 2, 3, 4, 5]},
-        "target_column": "churned"
+      "requirements": ["scikit-learn", "pandas", "numpy"],
+      "environment_vars": {
+        "DATA_PATH": "/data/customers.csv"
       },
-      "hyperparameters": {
-        "params": {
-          "n_estimators": 100,
-          "max_depth": 10,
-          "random_state": 42
-        }
-      },
-      "tags": {
-        "team": "data-science",
-        "use_case": "churn_prediction"
-      }
+      "timeout": 300,
+      "tags": {"version": "1.0", "team": "data-science"}
     }
     ```
 
     **Response:**
-    - `run_id`: MLflow run identifier
-    - `model_uri`: MLflow model URI for loading
-    - `metrics`: Training performance metrics
-    - `artifact_uri`: S3 location of model artifacts
+    - Returns immediately with job_id
+    - Use GET /mlops/training/jobs/{job_id} to check status
     """
-    return await service.train_model(request)
+    return await service.upload_and_execute_script(request)
 
 
-@router.get("/models", response_model=List[ModelInfo])
-async def list_models(
+@router.get("/training/jobs/{job_id}", response_model=TrainingJobStatus)
+async def get_training_job_status(
+    job_id: str,
     service: MLOpsService = Depends(get_service),
-) -> List[ModelInfo]:
+) -> TrainingJobStatus:
     """
-    List all registered models in MLflow Model Registry.
+    Get status of a training job.
 
-    Returns model metadata including:
-    - Model name and description
-    - Latest versions and their stages
-    - Creation and update timestamps
+    **Returns:**
+    - Job status: queued, running, completed, failed
+    - MLflow run_id (when completed)
+    - Registered model version (when completed)
+    - Execution logs
+    - Error details (if failed)
+    - Duration in seconds
     """
-    return await service.list_models()
+    return await service.get_training_job_status(job_id)
 
 
-@router.get("/models/{model_name}", response_model=ModelInfo)
-async def get_model(
-    model_name: str,
+# ============================================================================
+# Model Inference Endpoint (/inference)
+# ============================================================================
+
+
+@router.post("/inference", response_model=InferenceResponse)
+async def model_inference(
+    request: InferenceRequest,
     service: MLOpsService = Depends(get_service),
-) -> ModelInfo:
+) -> InferenceResponse:
     """
-    Get detailed information about a specific model.
+    Run inference on a deployed model.
 
-    Includes:
-    - All versions of the model
-    - Current stage for each version (Staging, Production, Archived)
-    - Associated metadata and tags
+    **Workflow:**
+    1. Load model from MLflow by name and version
+    2. Make predictions on provided input data
+    3. Optionally return prediction probabilities
+
+    **Example Request:**
+    ```json
+    {
+      "model_name": "churn_predictor",
+      "model_version": "1",
+      "inputs": {
+        "total_orders": [10, 25, 5],
+        "avg_order_value": [50.0, 120.5, 30.0],
+        "days_since_last_order": [5, 15, 30]
+      },
+      "return_probabilities": true
+    }
+    ```
+
+    **Response:**
+    ```json
+    {
+      "model_name": "churn_predictor",
+      "model_version": "1",
+      "predictions": [0, 0, 1],
+      "probabilities": [
+        [0.9, 0.1],
+        [0.85, 0.15],
+        [0.3, 0.7]
+      ],
+      "inference_time_ms": 12.5,
+      "timestamp": "2025-10-23T10:00:00Z"
+    }
+    ```
+
+    **Notes:**
+    - Input data should match the features the model was trained on
+    - Probabilities only available for classification models
+    - Model is cached for faster subsequent requests
     """
-    return await service.get_model_info(model_name)
+    return await service.inference(request)
 
 
 # ============================================================================
@@ -155,7 +180,6 @@ async def register_model(
     1. Takes a run_id from a training run
     2. Registers the model with a given name
     3. Creates a new version in the registry
-    4. Model can then be promoted through stages
 
     **Example Request:**
     ```json
@@ -171,190 +195,44 @@ async def register_model(
     ```
 
     **Use Case:**
-    After training completes, register the model to make it available
-    for use in batch predictions.
+    Manually register a model from a specific MLflow run.
     """
     return await service.register_model(request)
 
 
 # ============================================================================
-# Model Serving Endpoints (/serve)
-# ============================================================================
-
-# NOTE: Real-time predictions currently disabled - batch predictions only
-"""
-@router.post("/serve", response_model=PredictionOutput)
-async def predict(
-    request: PredictionInput,
-    service: MLOpsService = Depends(get_service),
-) -> PredictionOutput:
-    '''
-    Make real-time predictions using a registered model.
-
-    **Workflow:**
-    1. Load model from MLflow (by version or stage)
-    2. Retrieve features from Feast (or use provided features)
-    3. Make predictions
-    4. Return predictions with metadata
-
-    **Example Request (with Feast features):**
-    ```json
-    {
-      "model_name": "churn_predictor",
-      "model_stage": "Production",
-      "entities": {
-        "customer_id": [12345, 67890]
-      },
-      "return_features": true
-    }
-    ```
-
-    **Example Request (with direct features):**
-    ```json
-    {
-      "model_name": "churn_predictor",
-      "model_version": "3",
-      "features": {
-        "total_orders": 45,
-        "avg_order_value": 89.99,
-        "days_since_last_order": 7
-      }
-    }
-    ```
-
-    **Response:**
-    - `predictions`: Model predictions (list)
-    - `model_version`: Version used for prediction
-    - `features`: Features used (if requested)
-    '''
-    return await service.predict(request)
-"""
-
-
-@router.post("/serve/batch", response_model=BatchPredictionResponse, status_code=202)
-async def batch_predict(
-    request: BatchPredictionRequest,
-    service: MLOpsService = Depends(get_service),
-) -> BatchPredictionResponse:
-    """
-    Make batch predictions on large datasets.
-
-    **Workflow:**
-    1. Load model from MLflow
-    2. Retrieve features for all entities from Feast
-    3. Generate predictions for entire dataset
-    4. Save results to S3 as Parquet
-
-    **Example Request:**
-    ```json
-    {
-      "model_name": "churn_predictor",
-      "model_version": "3",
-      "feature_service": "customer_churn_features",
-      "entities_df": {
-        "customer_id": [1, 2, 3, ..., 10000]
-      },
-      "output_path": "s3://my-bucket/predictions/batch_2025_10_17.parquet"
-    }
-    ```
-
-    **Use Case:**
-    - Score entire customer base daily for churn risk
-    - Generate recommendations for all users
-    - Batch feature engineering + prediction pipelines
-    """
-    return await service.batch_predict(request)
-
-
-# ============================================================================
-# Model Monitoring Endpoints (/monitoring)
+# Model Management Endpoints (/models)
 # ============================================================================
 
 
-@router.post("/monitoring", response_model=MonitoringResponse, status_code=201)
-async def log_monitoring_metrics(
-    request: MonitoringRequest,
+@router.get("/models", response_model=List[ModelInfo])
+async def list_models(
     service: MLOpsService = Depends(get_service),
-) -> MonitoringResponse:
+) -> List[ModelInfo]:
     """
-    Log monitoring metrics for a deployed model.
+    List all registered models in MLflow Model Registry.
 
-    **Supported Metric Types:**
-    - `prediction_drift`: Monitor changes in prediction distribution
-    - `feature_drift`: Monitor changes in feature distribution
-    - `data_quality`: Monitor data quality issues (missing values, outliers)
-    - `model_performance`: Monitor model performance metrics
-    - `custom`: Custom monitoring metrics
-
-    **Example Request:**
-    ```json
-    {
-      "model_name": "churn_predictor",
-      "model_version": "3",
-      "metric_type": "prediction_drift",
-      "metrics": {
-        "drift_score": 0.15,
-        "psi": 0.08,
-        "js_divergence": 0.12
-      },
-      "reference_data": {
-        "mean": 0.35,
-        "std": 0.12
-      },
-      "current_data": {
-        "mean": 0.42,
-        "std": 0.15
-      },
-      "tags": {
-        "deployment": "production",
-        "region": "us-east-1"
-      }
-    }
-    ```
-
-    **Response:**
-    - `monitoring_id`: Unique identifier for this monitoring entry
-    - `alert_triggered`: Whether any alerts were triggered
-    - `alerts`: List of alert messages (if any)
-    - `metrics`: The logged metrics
-
-    **Alert Thresholds:**
-    - Drift metrics > 0.1 (10%)
-    - Missing data > 0.05 (5%)
-    - Accuracy < 0.7 (70%)
+    Returns model metadata including:
+    - Model name and description
+    - Latest versions
+    - Creation and update timestamps
     """
-    return await service.log_monitoring_metrics(request)
+    return await service.list_models()
 
 
-@router.post("/monitoring/history", response_model=MonitoringHistoryResponse)
-async def get_monitoring_history(
-    request: MonitoringHistoryRequest,
+@router.get("/models/{model_name}", response_model=ModelInfo)
+async def get_model(
+    model_name: str,
     service: MLOpsService = Depends(get_service),
-) -> MonitoringHistoryResponse:
+) -> ModelInfo:
     """
-    Get monitoring history for a model.
+    Get detailed information about a specific model.
 
-    **Example Request:**
-    ```json
-    {
-      "model_name": "churn_predictor",
-      "model_version": "3",
-      "metric_type": "prediction_drift",
-      "start_date": "2025-10-01T00:00:00Z",
-      "end_date": "2025-10-17T23:59:59Z",
-      "limit": 100
-    }
-    ```
-
-    **Response:**
-    - `total_records`: Total number of monitoring records
-    - `records`: List of monitoring entries (limited by request)
-    - `summary`: Summary statistics including:
-      - Total alerts triggered
-      - Metric types logged
-      - Date range of data
+    Includes:
+    - All versions of the model
+    - Associated metadata and tags
     """
-    return await service.get_monitoring_history(request)
+    return await service.get_model_info(model_name)
 
 
 # ============================================================================
@@ -377,19 +255,3 @@ async def get_status(
     - Count of feature views
     """
     return await service.get_status()
-
-
-# @router.get("/health")
-# async def health_check():
-#     """Simple health check endpoint."""
-#     return {
-#         "status": "healthy",
-#         "service": "mlops",
-#         "endpoints": {
-#             "training": "/mlops/models",
-#             "registry": "/mlops/registry",
-#             "batch_serving": "/mlops/serve/batch",
-#             "monitoring": "/mlops/monitoring",
-#         },
-#         "note": "Real-time predictions disabled - batch only",
-#     }

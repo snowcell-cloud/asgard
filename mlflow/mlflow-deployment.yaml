@@ -85,15 +85,16 @@ spec:
                 --port=5000 \
                 --backend-store-uri=${MLFLOW_BACKEND_STORE_URI} \
                 --default-artifact-root=${MLFLOW_DEFAULT_ARTIFACT_ROOT} \
-                --serve-artifacts
+                --serve-artifacts \
+                --gunicorn-opts="--timeout 120 --workers 2 --worker-class sync"
 
           resources:
             requests:
-              memory: "1Gi"
-              cpu: "1000m"
-            limits:
               memory: "2Gi"
-              cpu: "2000m"
+              cpu: "1500m"
+            limits:
+              memory: "4Gi"
+              cpu: "3000m"
 
           livenessProbe:
             httpGet:
