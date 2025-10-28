@@ -86,7 +86,7 @@ spec:
                 --backend-store-uri=${MLFLOW_BACKEND_STORE_URI} \
                 --default-artifact-root=${MLFLOW_DEFAULT_ARTIFACT_ROOT} \
                 --serve-artifacts \
-                --gunicorn-opts="--timeout 120 --workers 2 --worker-class sync"
+                --gunicorn-opts="--timeout 300 --workers 4 --worker-class sync --keep-alive 5"
 
           resources:
             requests:
