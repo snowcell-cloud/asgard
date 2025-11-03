@@ -9,6 +9,7 @@
 ## 🎯 Testing Scope
 
 Comprehensive testing of MLflow API functionality including:
+
 - Health checks
 - Experiment management
 - Run creation and tracking
@@ -20,11 +21,11 @@ Comprehensive testing of MLflow API functionality including:
 
 ## ✅ Test Results Summary
 
-| Category | Tests | Passed | Failed | Status |
-|----------|-------|--------|--------|--------|
-| **MLflow Core API** | 9 | 9 | 0 | ✅ PASS |
-| **Asgard Integration** | 3 | 3 | 0 | ✅ PASS |
-| **Total** | **12** | **12** | **0** | **✅ 100%** |
+| Category               | Tests  | Passed | Failed | Status      |
+| ---------------------- | ------ | ------ | ------ | ----------- |
+| **MLflow Core API**    | 9      | 9      | 0      | ✅ PASS     |
+| **Asgard Integration** | 3      | 3      | 0      | ✅ PASS     |
+| **Total**              | **12** | **12** | **0**  | **✅ 100%** |
 
 ---
 
@@ -35,46 +36,55 @@ Comprehensive testing of MLflow API functionality including:
 #### Test Script: `test_mlflow_api.py`
 
 **✅ Health Check**
+
 - Endpoint: `GET /health`
 - Status: PASS
 - Response: `OK`
 
 **✅ List/Search Experiments**
+
 - Endpoint: `GET /api/2.0/mlflow/experiments/search`
 - Status: PASS
 - Found: 1 experiment (Default)
 
 **✅ Create Experiment**
+
 - Endpoint: `POST /api/2.0/mlflow/experiments/create`
 - Status: PASS
 - Created: test_experiment_1761899714 (ID: 1)
 
 **✅ Create Run**
+
 - Endpoint: `POST /api/2.0/mlflow/runs/create`
 - Status: PASS
 - Run ID: 8b8d4934ed734dbea6431937c3724ecb
 
 **✅ Log Metric**
+
 - Endpoint: `POST /api/2.0/mlflow/runs/log-metric`
 - Status: PASS
 - Logged: accuracy = 0.95
 
 **✅ Log Parameter**
+
 - Endpoint: `POST /api/2.0/mlflow/runs/log-parameter`
 - Status: PASS
 - Logged: learning_rate = 0.001
 
 **✅ Update Run**
+
 - Endpoint: `POST /api/2.0/mlflow/runs/update`
 - Status: PASS
 - Updated: Status to FINISHED
 
 **✅ Get Run**
+
 - Endpoint: `GET /api/2.0/mlflow/runs/get`
 - Status: PASS
 - Retrieved: Complete run details with metrics and parameters
 
 **✅ List Registered Models**
+
 - Endpoint: `GET /api/2.0/mlflow/registered-models/search`
 - Status: PASS
 - Found: 0 registered models
@@ -86,10 +96,12 @@ Comprehensive testing of MLflow API functionality including:
 #### Test Script: `test_asgard_mlflow_integration.py`
 
 **✅ MLflow Connectivity**
+
 - Direct MLflow health check: PASS
 - MLflow API accessibility: PASS
 
 **✅ Asgard MLOps Status**
+
 - Endpoint: `GET /mlops/status`
 - Status: PASS
 - Results:
@@ -101,6 +113,7 @@ Comprehensive testing of MLflow API functionality including:
   - Feature Views: 0
 
 **✅ Asgard List Models**
+
 - Endpoint: `GET /mlops/models`
 - Status: PASS
 - Found: 0 models
@@ -110,9 +123,11 @@ Comprehensive testing of MLflow API functionality including:
 ## 🔧 Test Scripts Created
 
 ### 1. `/mlflow/test_mlflow_api.py`
+
 **Purpose**: Comprehensive MLflow API testing
 
 **Features**:
+
 - Tests all core MLflow operations
 - Creates test experiment and runs
 - Logs metrics and parameters
@@ -120,21 +135,25 @@ Comprehensive testing of MLflow API functionality including:
 - Full JSON response validation
 
 **Usage**:
+
 ```bash
 cd /home/hac/downloads/code/asgard-dev/mlflow
 python3 test_mlflow_api.py
 ```
 
 ### 2. `/mlflow/test_asgard_mlflow_integration.py`
+
 **Purpose**: Test Asgard <-> MLflow integration
 
 **Features**:
+
 - Validates MLflow connectivity from Asgard
 - Tests MLOps status endpoint
 - Verifies model listing
 - Checks service-to-service communication
 
 **Usage**:
+
 ```bash
 # Requires both port forwards active
 kubectl port-forward -n asgard svc/mlflow-service 5000:5000 &
@@ -143,9 +162,11 @@ python3 test_asgard_mlflow_integration.py
 ```
 
 ### 3. `/mlflow/test_e2e_workflow.py`
+
 **Purpose**: End-to-end workflow testing (for future use)
 
 **Features**:
+
 - Tests script upload
 - Monitors training execution
 - Validates model inference
@@ -160,22 +181,26 @@ python3 test_asgard_mlflow_integration.py
 ### Current Configuration
 
 **Deployment**: `mlflow-deployment-88768f68d-gr5sw`
+
 - ✅ Status: Running
 - ✅ Workers: 4 (sync class)
 - ✅ Timeout: 300 seconds
 - ✅ Keep-alive: 5 seconds
 
 **Backend Store**:
+
 - Type: PostgreSQL
 - URI: `postgresql://mlflow:mlflow123@postgres-service.asgard.svc.cluster.local:5432/mlflow`
 - Status: ✅ Connected
 
 **Artifact Store**:
+
 - Type: AWS S3
 - Bucket: `s3://airbytedestination1/mlflow-artifacts`
 - Status: ✅ Accessible
 
 **Service**:
+
 - Type: ClusterIP
 - Port: 5000
 - Endpoint: `mlflow-service.asgard.svc.cluster.local:5000`
@@ -187,13 +212,13 @@ python3 test_asgard_mlflow_integration.py
 
 ### Response Times (Average over 10 requests)
 
-| Endpoint | Response Time | Status |
-|----------|--------------|--------|
-| `/health` | 12ms | ✅ Excellent |
-| `/api/2.0/mlflow/experiments/search` | 853ms | ✅ Good |
-| `/api/2.0/mlflow/runs/create` | 245ms | ✅ Good |
-| `/api/2.0/mlflow/runs/log-metric` | 180ms | ✅ Good |
-| `/api/2.0/mlflow/runs/get` | 320ms | ✅ Good |
+| Endpoint                             | Response Time | Status       |
+| ------------------------------------ | ------------- | ------------ |
+| `/health`                            | 12ms          | ✅ Excellent |
+| `/api/2.0/mlflow/experiments/search` | 853ms         | ✅ Good      |
+| `/api/2.0/mlflow/runs/create`        | 245ms         | ✅ Good      |
+| `/api/2.0/mlflow/runs/log-metric`    | 180ms         | ✅ Good      |
+| `/api/2.0/mlflow/runs/get`           | 320ms         | ✅ Good      |
 
 ### Worker Stability
 
@@ -210,6 +235,7 @@ python3 test_asgard_mlflow_integration.py
 ### No Critical Issues Found ✅
 
 All tests passed without errors. The MLflow API is:
+
 - ✅ Fully functional
 - ✅ Properly configured
 - ✅ Stable and performant
@@ -254,22 +280,27 @@ All tests passed without errors. The MLflow API is:
 ## 🚀 Recommendations
 
 ### Immediate Actions
+
 1. ✅ **DONE** - MLflow API is fully functional and tested
 2. ✅ **DONE** - Integration with Asgard validated
 3. ✅ **DONE** - Comprehensive test scripts created
 
 ### Future Enhancements
+
 1. **Deploy Updated Code**
+
    - Rebuild Docker image with new MLOps endpoints
    - Deploy updated image to Kubernetes
    - Test end-to-end workflow with script upload
 
 2. **Monitoring**
+
    - Set up Prometheus metrics for MLflow
    - Add alerting for worker timeouts
    - Monitor S3 artifact storage usage
 
 3. **Performance**
+
    - Consider adding Redis cache for experiment metadata
    - Optimize database queries for large-scale deployments
    - Add connection pooling for PostgreSQL
@@ -308,6 +339,7 @@ All tests passed without errors. The MLflow API is:
 **MLflow API Status: ✅ PRODUCTION READY**
 
 All core MLflow functionality has been thoroughly tested and validated:
+
 - ✅ 12/12 tests passed (100% success rate)
 - ✅ All API endpoints functional
 - ✅ Integration with Asgard working
@@ -316,6 +348,7 @@ All core MLflow functionality has been thoroughly tested and validated:
 - ✅ Comprehensive test suite created
 
 The MLflow deployment is **production-ready** and can handle:
+
 - Experiment tracking
 - Run management
 - Metrics and parameters logging
