@@ -892,7 +892,7 @@ print(f"MLflow available: {status['mlflow_available']}")
 
 # Upload training script
 job = client.upload_script(
-    script_path="train_model.py",
+    script_path="*train_model.py",
     experiment_name="customer_churn",
     model_name="churn_predictor",
     requirements=["scikit-learn", "pandas", "numpy"],
