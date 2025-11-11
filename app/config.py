@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     feast_repo_path: str = "/tmp/feast_repo"
     model_storage_path: str = "/tmp/models"
 
+    # MLflow configuration
+    mlflow_tracking_uri: str = "http://mlflow-service.asgard.svc.cluster.local:5000"
+    mlflow_artifact_location: Optional[str] = None  # Uses MLflow default S3 bucket
+
     # Trino configuration (used by dbt and feast)
     trino_host: str = "trino.data-platform.svc.cluster.local"
     trino_port: int = 8080

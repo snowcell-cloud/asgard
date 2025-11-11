@@ -73,10 +73,11 @@ autoscaling:
 resources:
   limits:
     cpu: 2000m
-    memory: 2000Mi
+    memory: 4000Mi
   requests:
-    cpu: 1000m
-    memory: 1000Mi
+    cpu: 1500m
+    memory: 2000Mi
+
 
 # Volume configuration for dbt temp storage
 volumes:

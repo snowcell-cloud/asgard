@@ -1,8 +1,7 @@
 """
-FastAPI router for Feast Feature Store and ML Model APIs.
+FastAPI router for Feast Feature Store.
 
-NOTE: Currently configured for OFFLINE STORE ONLY.
-Online predictions are disabled. Use batch predictions instead.
+NOTE: Feature management ONLY. For ML models, use /mlops endpoints.
 
 Data Source: Iceberg Catalog (S3 Parquet - Native Storage)
 - Features are read directly from S3 Parquet files created by Iceberg
@@ -15,16 +14,17 @@ Architecture:
          ↓ (direct read)
   Feast FileSource (S3 path)
          ↓
-  Offline Store (batch predictions)
+  Feature Store (offline serving)
+         ↓
+  MLOps (/mlops endpoints for training & predictions)
 
 Endpoints:
 - POST /features → Define and register feature sets from Iceberg gold layer
-- POST /models → Train and version ML models
-- POST /predictions/batch → Request batch predictions (online predictions disabled)
+- POST /features/service → Create feature service (grouping of feature views)
 - GET /features → List all feature views
-- GET /features/{name} → Get feature view details
-- GET /models → List all trained models
 - GET /status → Get feature store status
+
+For ML Model Training & Predictions: Use /mlops endpoints
 """
 
 from typing import List
@@ -32,21 +32,15 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.feast.schemas import (
-    BatchPredictionRequest,
     FeatureServiceRequest,
     FeatureSetResponse,
     FeatureStoreStatus,
     FeatureViewInfo,
     FeatureViewRequest,
-    ModelInfo,
-    ModelTrainingRequest,
-    ModelTrainingResponse,
-    OnlinePredictionRequest,
-    PredictionResponse,
 )
 from app.feast.service import FeatureStoreService
 
-router = APIRouter(prefix="/feast", tags=["Feast Feature Store & ML"])
+router = APIRouter(prefix="/feast", tags=["Feast Feature Store"])
 
 # Singleton service instance
 _service_instance = None
@@ -163,186 +157,7 @@ async def get_feature_store_status(
     - Registry and store types
     - Count of feature views, entities, services
     - List of registered components
+
+    NOTE: For ML model training and predictions, use /mlops endpoints.
     """
     return await service.get_store_status()
-
-
-# ============================================================================
-# Model Training Endpoints
-# ============================================================================
-
-
-@router.post("/models", response_model=ModelTrainingResponse, status_code=201)
-async def train_model(
-    request: ModelTrainingRequest,
-    service: FeatureStoreService = Depends(get_service),
-) -> ModelTrainingResponse:
-    """
-    Train a new ML model using features from gold layer.
-
-    This endpoint:
-    1. Retrieves historical features from Feast
-    2. Splits data into train/test sets
-    3. Trains model using specified framework
-    4. Evaluates and saves model
-    5. Returns metrics and model version
-
-    **Supported Frameworks:**
-    - sklearn (RandomForest, Gradient Boosting)
-    - xgboost
-    - lightgbm
-    - tensorflow
-    - pytorch
-
-    **Example Request:**
-    ```json
-    {
-      "name": "churn_predictor",
-      "framework": "sklearn",
-      "model_type": "classification",
-      "training_data": {
-        "entity_df_source": "customers",
-        "label_column": "churned",
-        "event_timestamp_column": "event_date",
-        "start_date": "2024-01-01T00:00:00Z",
-        "end_date": "2024-12-31T23:59:59Z"
-      },
-      "hyperparameters": {
-        "params": {
-          "n_estimators": 100,
-          "max_depth": 10,
-          "random_state": 42
-        }
-      },
-      "test_size": 0.2,
-      "description": "Customer churn prediction model"
-    }
-    ```
-
-    **Response includes:**
-    - Model ID and version
-    - Training/test metrics
-    - Artifact storage location
-    - Training duration
-    """
-    return await service.train_model(request)
-
-
-@router.get("/models", response_model=List[ModelInfo])
-async def list_models(
-    service: FeatureStoreService = Depends(get_service),
-) -> List[ModelInfo]:
-    """
-    List all trained models.
-
-    Returns:
-    - Model ID, name, version
-    - Framework and model type
-    - Training metrics
-    - Creation timestamp
-    """
-    return await service.list_models()
-
-
-# ============================================================================
-# Prediction Endpoints
-# ============================================================================
-
-# NOTE: Online predictions disabled - using offline store only
-# Uncomment when online store is enabled
-"""
-@router.post("/predictions/online", response_model=PredictionResponse)
-async def predict_online(
-    request: OnlinePredictionRequest,
-    service: FeatureStoreService = Depends(get_service),
-) -> PredictionResponse:
-    '''
-    Make real-time online prediction.
-
-    This endpoint:
-    1. Loads the specified model
-    2. Retrieves online features (if configured)
-    3. Makes prediction
-    4. Returns prediction with optional probabilities
-
-    **Example Request:**
-    ```json
-    {
-      "model_id": "abc123-def456",
-      "features": {
-        "total_orders": 42,
-        "avg_order_value": 125.50,
-        "days_since_last_order": 7,
-        "customer_age": 35
-      },
-      "include_feature_values": true
-    }
-    ```
-
-    **Response:**
-    ```json
-    {
-      "prediction_id": "xyz789",
-      "model_id": "abc123-def456",
-      "model_version": "20250109_120000",
-      "mode": "online",
-      "prediction": 0.85,
-      "probabilities": {
-        "class_0": 0.15,
-        "class_1": 0.85
-      },
-      "features_used": {...},
-      "created_at": "2025-01-09T12:00:00Z",
-      "execution_time_seconds": 0.05,
-      "status": "completed"
-    }
-    ```
-    '''
-    return await service.predict_online(request)
-"""
-
-
-@router.post("/predictions/batch", response_model=PredictionResponse)
-async def predict_batch(
-    request: BatchPredictionRequest,
-    service: FeatureStoreService = Depends(get_service),
-) -> PredictionResponse:
-    """
-    Make batch predictions on gold layer table.
-
-    This endpoint:
-    1. Loads input data from specified table
-    2. Retrieves point-in-time features (if configured)
-    3. Makes predictions for all rows
-    4. Writes results to output table
-
-    **Example Request:**
-    ```json
-    {
-      "model_id": "abc123-def456",
-      "input_table": "customers_to_score",
-      "entity_columns": ["customer_id"],
-      "feature_views": ["customer_features"],
-      "output_table": "churn_predictions",
-      "output_schema": "gold",
-      "prediction_column_name": "churn_probability",
-      "event_timestamp_column": "score_date"
-    }
-    ```
-
-    **Response:**
-    ```json
-    {
-      "prediction_id": "batch_xyz",
-      "model_id": "abc123-def456",
-      "model_version": "20250109_120000",
-      "mode": "batch",
-      "output_table": "iceberg.gold.churn_predictions",
-      "num_predictions": 10000,
-      "created_at": "2025-01-09T12:00:00Z",
-      "execution_time_seconds": 45.2,
-      "status": "completed"
-    }
-    ```
-    """
-    return await service.predict_batch(request)
