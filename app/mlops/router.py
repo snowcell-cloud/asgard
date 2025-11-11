@@ -24,6 +24,8 @@ from app.mlops.schemas import (
     TrainingScriptUploadResponse,
     ModelVersionInfo,
     MLOpsStatus,
+    DeployModelRequest,
+    DeployModelResponse,
 )
 from app.mlops.service import MLOpsService
 
@@ -233,6 +235,100 @@ async def get_model(
     - Associated metadata and tags
     """
     return await service.get_model_info(model_name)
+
+
+# ============================================================================
+# End-to-End Deployment (/deploy)
+# ============================================================================
+
+
+@router.post("/deploy", status_code=202)
+async def deploy_model(
+    request: DeployModelRequest,
+    service: MLOpsService = Depends(get_service),
+):
+    """
+    🚀 **ONE-CLICK DEPLOYMENT**: Train → Build → Push to ECR → Deploy to K8s
+
+    **Complete automated workflow in a single API call:**
+    1. ✅ Train model using provided Python script
+    2. ✅ Build optimized Docker image
+    3. ✅ Push image to AWS ECR
+    4. ✅ Deploy to Kubernetes with LoadBalancer
+    5. ✅ Return public inference URL
+
+    **Example Request:**
+    ```json
+    {
+      "script_name": "train_model.py",
+      "script_content": "aW1wb3J0IG1sZmxvdw...",
+      "experiment_name": "production_experiment",
+      "model_name": "customer_churn_model",
+      "requirements": ["scikit-learn", "pandas", "numpy"],
+      "environment_vars": {},
+      "timeout": 300,
+      "tags": {"version": "1.0"},
+      "replicas": 2,
+      "namespace": "asgard"
+    }
+    ```
+
+    **Response:**
+    ```json
+    {
+      "job_id": "a3b4c5d6",
+      "model_name": "customer_churn_model",
+      "status": "training",
+      "message": "Deployment started. Use /mlops/deployments/{job_id} to check status"
+    }
+    ```
+
+    **After completion (check via /mlops/deployments/{job_id}):**
+    - `deployment_url`: http://<external-ip>
+    - `external_ip`: LoadBalancer IP address
+    - `ecr_image`: Full ECR image URI
+    - `model_version`: Registered model version
+
+    **Endpoints on deployed service:**
+    - `GET /health` - Health check
+    - `GET /metadata` - Model information
+    - `POST /predict` - Make predictions
+
+    **Notes:**
+    - Deployment runs in background (async)
+    - Uses multi-stage Docker builds for optimization
+    - Automatically configures ECR credentials
+    - Sets up AWS credentials for S3 access
+    - Creates LoadBalancer service for external access
+    """
+    return await service.deploy_model_end_to_end(request)
+
+
+@router.get("/deployments/{job_id}")
+async def get_deployment_status(
+    job_id: str,
+    service: MLOpsService = Depends(get_service),
+):
+    """
+    Get status of an end-to-end deployment job.
+
+    **Status values:**
+    - `training`: Training model
+    - `building`: Building Docker image
+    - `pushing`: Pushing to ECR
+    - `deploying`: Deploying to Kubernetes
+    - `deployed`: Successfully deployed ✅
+    - `failed`: Deployment failed ❌
+
+    **Response includes:**
+    - Current status
+    - Deployment URL (when ready)
+    - External IP
+    - Model version
+    - ECR image URI
+    - Error details (if failed)
+    """
+    return await service.get_deployment_status(job_id)
 
 
 # ============================================================================
