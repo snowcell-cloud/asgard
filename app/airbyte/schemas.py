@@ -198,7 +198,7 @@ class ScheduleConfig(BaseModel):
         ..., example="cron", description="Type of schedule (cron, basic, manual)"
     )
     cronExpression: Optional[str] = Field(
-        None, example="0 0 * * *", description="Cron expression for scheduling"
+        None, example="0 0 12 * * ?", description="Cron expression for scheduling"
     )
 
 

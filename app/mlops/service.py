@@ -1,11 +1,13 @@
 """
 MLOps Service for ML lifecycle management.
 
-Simplified service for script-based training and model serving:
+Management and orchestration for ML workflows:
 - Upload and execute Python training scripts
 - Register models to MLflow
-- Serve models for inference
-- Track training job status
+- One-click deployment to Kubernetes
+- Track training and deployment job status
+
+Note: Model inference is handled by deployed inference services, not here.
 """
 
 import os
@@ -27,8 +29,6 @@ from mlflow.tracking import MlflowClient
 
 from app.feast.service import FeatureStoreService
 from app.mlops.schemas import (
-    InferenceRequest,
-    InferenceResponse,
     ModelInfo,
     ModelVersionInfo,
     RegisterModelRequest,
@@ -60,9 +60,6 @@ class MLOpsService:
 
         # Initialize deployment service for automated model deployment
         self.deployment_service = ModelDeploymentService()
-
-        # Model cache for serving
-        self.model_cache: Dict[str, Any] = {}
 
         # Training jobs storage (in-memory for now)
         self.training_jobs: Dict[str, Dict[str, Any]] = {}
@@ -531,57 +528,6 @@ mlflow.set_experiment('{experiment_name}')
                 completed_at=job["completed_at"],
                 duration_seconds=duration_seconds,
             )
-
-    # ========================================================================
-    # Model Inference (/inference)
-    # ========================================================================
-
-    async def inference(self, request: InferenceRequest) -> InferenceResponse:
-        """
-        Run inference on a deployed model.
-
-        This is a simplified inference endpoint that loads the model
-        and makes predictions on the provided input data.
-        """
-        try:
-            start_time = time.time()
-
-            # Load model
-            model, model_version, run_id = await self._load_model(
-                request.model_name, request.model_version
-            )
-
-            # Prepare input data
-            X = pd.DataFrame(request.inputs)
-
-            # Make predictions
-            predictions = model.predict(X)
-
-            # Get probabilities if requested and model supports it
-            probabilities = None
-            if request.return_probabilities:
-                try:
-                    if hasattr(model, "predict_proba"):
-                        probabilities = model.predict_proba(X).tolist()
-                except Exception:
-                    pass  # Model doesn't support probabilities
-
-            # Calculate inference time
-            inference_time_ms = (time.time() - start_time) * 1000
-
-            return InferenceResponse(
-                model_name=request.model_name,
-                model_version=model_version,
-                predictions=(
-                    predictions.tolist() if hasattr(predictions, "tolist") else list(predictions)
-                ),
-                probabilities=probabilities,
-                inference_time_ms=round(inference_time_ms, 2),
-                timestamp=datetime.utcnow(),
-            )
-
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Inference failed: {str(e)}")
 
     # ========================================================================
     # End-to-End Deployment (/deploy)

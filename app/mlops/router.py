@@ -1,12 +1,19 @@
 """
 FastAPI router for MLOps APIs.
 
-Simplified API for script-based training and model serving:
+MLOps Management and Orchestration:
 - /training/upload: Upload Python scripts for training
 - /training/jobs/{job_id}: Check training job status
-- /inference: Run predictions on trained models
-- /registry: Register and manage models
-- /models: List registered models
+- /deploy: One-click deployment (train → build → push → deploy)
+- /deployments/{job_id}: Check deployment status
+- /registry: Register models to MLflow
+- /models: List and manage registered models
+- /status: Platform health status
+
+NOTE: Model inference is NOT done here. Use the deployed model's inference URL:
+- Deploy a model via /deploy endpoint
+- Get deployment_url from /deployments/{job_id}
+- Use {deployment_url}/predict for inference
 """
 
 from typing import List, Optional
@@ -14,8 +21,6 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.mlops.schemas import (
-    InferenceRequest,
-    InferenceResponse,
     ModelInfo,
     RegisterModelRequest,
     RegisterModelResponse,
@@ -107,62 +112,6 @@ async def get_training_job_status(
     - Duration in seconds
     """
     return await service.get_training_job_status(job_id)
-
-
-# ============================================================================
-# Model Inference Endpoint (/inference)
-# ============================================================================
-
-
-@router.post("/inference", response_model=InferenceResponse)
-async def model_inference(
-    request: InferenceRequest,
-    service: MLOpsService = Depends(get_service),
-) -> InferenceResponse:
-    """
-    Run inference on a deployed model.
-
-    **Workflow:**
-    1. Load model from MLflow by name and version
-    2. Make predictions on provided input data
-    3. Optionally return prediction probabilities
-
-    **Example Request:**
-    ```json
-    {
-      "model_name": "churn_predictor",
-      "model_version": "1",
-      "inputs": {
-        "total_orders": [10, 25, 5],
-        "avg_order_value": [50.0, 120.5, 30.0],
-        "days_since_last_order": [5, 15, 30]
-      },
-      "return_probabilities": true
-    }
-    ```
-
-    **Response:**
-    ```json
-    {
-      "model_name": "churn_predictor",
-      "model_version": "1",
-      "predictions": [0, 0, 1],
-      "probabilities": [
-        [0.9, 0.1],
-        [0.85, 0.15],
-        [0.3, 0.7]
-      ],
-      "inference_time_ms": 12.5,
-      "timestamp": "2025-10-23T10:00:00Z"
-    }
-    ```
-
-    **Notes:**
-    - Input data should match the features the model was trained on
-    - Probabilities only available for classification models
-    - Model is cached for faster subsequent requests
-    """
-    return await service.inference(request)
 
 
 # ============================================================================
@@ -283,16 +232,56 @@ async def deploy_model(
     }
     ```
 
-    **After completion (check via /mlops/deployments/{job_id}):**
-    - `deployment_url`: http://<external-ip>
+    **After deployment completes:**
+    Check status via `/mlops/deployments/{job_id}` to get:
+    - `deployment_url`: http://<external-ip> (USE THIS FOR INFERENCE!)
     - `external_ip`: LoadBalancer IP address
     - `ecr_image`: Full ECR image URI
     - `model_version`: Registered model version
 
-    **Endpoints on deployed service:**
-    - `GET /health` - Health check
-    - `GET /metadata` - Model information
-    - `POST /predict` - Make predictions
+    **🎯 INFERENCE ENDPOINTS (on deployed service, NOT here):**
+    
+    Once deployed, use the `deployment_url` to access:
+    
+    - **GET {deployment_url}/health** - Health check
+      ```bash
+      curl http://<external-ip>/health
+      ```
+    
+    - **GET {deployment_url}/metadata** - Model information
+      ```bash
+      curl http://<external-ip>/metadata
+      ```
+    
+    - **POST {deployment_url}/predict** - Make predictions ⭐
+      ```bash
+      curl -X POST http://<external-ip>/predict \\
+        -H "Content-Type: application/json" \\
+        -d '{
+          "inputs": {
+            "feature1": [1, 2, 3],
+            "feature2": [4, 5, 6]
+          }
+        }'
+      ```
+      
+      Response:
+      ```json
+      {
+        "predictions": [0, 1, 1]
+      }
+      ```
+    
+    - **GET {deployment_url}/** - API info
+      ```bash
+      curl http://<external-ip>/
+      ```
+
+    **⚠️ IMPORTANT:**
+    - Inference is NOT done via /mlops/inference (removed)
+    - Each deployed model has its own dedicated inference URL
+    - This ensures better scalability, isolation, and performance
+    - Each model can be scaled independently
 
     **Notes:**
     - Deployment runs in background (async)
