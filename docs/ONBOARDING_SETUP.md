@@ -1,9 +1,9 @@
 # Asgard Platform - Onboarding & Setup Guide
 
-**Complete Setup Instructions for New Users**  
+**Complete Setup Instructions**  
 **Last Updated:** November 11, 2025  
 **Version:** 1.0  
-**Status:** ✅ Production Ready
+
 
 ---
 
@@ -11,7 +11,7 @@
 
 1. [What is Asgard?](#what-is-asgard)
 2. [Prerequisites](#prerequisites)
-3. [Quick Start (5 Minutes)](#quick-start-5-minutes)
+3. [Quick Start  ](#quick-start-5-minutes)
 4. [Complete Installation](#complete-installation)
 5. [Initial Configuration](#initial-configuration)
 6. [Verify Installation](#verify-installation)
@@ -58,8 +58,8 @@ External DBs → Airbyte → Spark → DBT → Feast → MLOps
 | **Helm**       | 3.0+    | Package manager         | [Install Helm](https://helm.sh/docs/intro/install/)        |
 | **Docker**     | 20.10+  | Container runtime       | [Install Docker](https://docs.docker.com/get-docker/)      |
 | **Python**     | 3.11+   | Client scripts          | [Install Python](https://www.python.org/downloads/)        |
-| **curl**       | Latest  | API testing             | Pre-installed on most systems                              |
-| **jq**         | Latest  | JSON parsing            | `sudo apt install jq` or `brew install jq`                 |
+| **curl**       | Latest  | API testing             | Pre-installed on most systems                             
+
 
 ### Cloud Resources (Optional)
 
@@ -315,135 +315,5 @@ kubectl get ingress -n asgard
 | **Health Check**    | http://localhost:8000/health | Platform status                        |
 
 ---
-
-## First Steps
-
-### 1. Explore the API
-
-Open the Swagger UI to see all available endpoints:
-
-```bash
-# Open in browser
-open http://localhost:8000/docs
-
-# Or use curl to explore
-curl http://localhost:8000/openapi.json | jq '.paths | keys'
-```
-
-### 2. Run a Simple Test
-
-```bash
-# Test Airbyte integration
-curl -X GET http://localhost:8000/datasource | jq
-
-# Test Spark integration
-curl -X GET http://localhost:8000/spark/status | jq
-
-# Test DBT integration
-curl -X GET http://localhost:8000/dbt/status | jq
-
-# Test Feast integration
-curl -X GET http://localhost:8000/feast/status | jq
-
-# Test MLOps integration
-curl -X GET http://localhost:8000/mlops/status | jq
-```
-
-### 3. Review Example Data
-
-The platform comes with example datasets in the Iceberg catalog:
-
-```bash
-# List available tables
-curl -X GET http://localhost:8000/data-products | jq
-
-# Query sample data
-curl -X POST http://localhost:8000/data-products/query \
-  -H "Content-Type: application/json" \
-  -d '{
-    "table_name": "bronze.sample_customers",
-    "limit": 10
-  }' | jq
-```
-
----
-
-## Next Steps
-
-### For Data Engineers
-
-1. **Set up data sources** - Connect to your databases using Airbyte
-   - See: [API_TESTING_GUIDE.md](API_TESTING_GUIDE.md) → Airbyte Section
-2. **Create data transformations** - Build Spark and DBT pipelines
-
-   - See: [USE_CASE_GUIDE.md](USE_CASE_GUIDE.md) → Data Transformation
-
-3. **Monitor data quality** - Set up validation and monitoring
-   - See: [DEBUGGING_GUIDE.md](DEBUGGING_GUIDE.md) → Data Validation
-
-### For ML Engineers
-
-1. **Explore feature store** - Register and query features
-   - See: [API_TESTING_GUIDE.md](API_TESTING_GUIDE.md) → Feast Section
-2. **Train your first model** - Upload training scripts
-   - See: [USE_CASE_GUIDE.md](USE_CASE_GUIDE.md) → ML Training
-3. **Deploy models** - Serve models for inference
-   - See: [API_TESTING_GUIDE.md](API_TESTING_GUIDE.md) → MLOps Section
-
-### For DevOps Engineers
-
-1. **Configure production deployment** - Set up ingress, autoscaling
-   - See: [ARCHITECTURE.md](ARCHITECTURE.md) → Production Setup
-2. **Set up monitoring** - Configure metrics and alerts
-   - See: [DEBUGGING_GUIDE.md](DEBUGGING_GUIDE.md) → Monitoring
-3. **Optimize performance** - Tune Spark, configure caching
-   - See: [ARCHITECTURE.md](ARCHITECTURE.md) → Performance Tuning
-
-### For All Users
-
-1. **Complete the end-to-end tutorial** - Follow the customer churn example
-   - See: [USE_CASE_GUIDE.md](USE_CASE_GUIDE.md)
-2. **Understand the architecture** - Learn about components and data flow
-   - See: [ARCHITECTURE.md](ARCHITECTURE.md)
-3. **Explore visual diagrams** - See system diagrams and flowcharts
-   - See: [DIAGRAMS.md](DIAGRAMS.md)
-
----
-
-## Support & Resources
-
-### Documentation
-
-- **API Testing**: [API_TESTING_GUIDE.md](API_TESTING_GUIDE.md)
-- **Use Cases**: [USE_CASE_GUIDE.md](USE_CASE_GUIDE.md)
-- **Architecture**: [ARCHITECTURE.md](ARCHITECTURE.md)
-- **Diagrams**: [DIAGRAMS.md](DIAGRAMS.md)
-- **Debugging**: [DEBUGGING_GUIDE.md](DEBUGGING_GUIDE.md)
-
-### Quick Links
-
-- **Swagger UI**: http://localhost:8000/docs
-- **MLflow UI**: http://localhost:5000
-- **Project Repository**: [GitHub](https://github.com/your-org/asgard-dev)
-
-### Getting Help
-
-- **Troubleshooting**: See [DEBUGGING_GUIDE.md](DEBUGGING_GUIDE.md)
-- **Common Issues**: Check logs with `kubectl logs -n asgard <pod-name>`
-- **Community**: Join our Slack channel (link)
-
----
-
-## Summary Checklist
-
-Before proceeding, ensure you have:
-
-- [ ] Kubernetes cluster running
-- [ ] All pods in `Running` state
-- [ ] Port forwarding configured
-- [ ] API accessible at http://localhost:8000
-- [ ] Swagger UI loads successfully
-- [ ] Health check returns `"status": "healthy"`
-- [ ] All service integrations show as `"connected"`
-
-✅ **All set?** Continue to [USE_CASE_GUIDE.md](USE_CASE_GUIDE.md) for your first end-to-end workflow!
+ 
+   
