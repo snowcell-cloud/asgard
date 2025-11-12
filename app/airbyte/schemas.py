@@ -136,8 +136,8 @@ class S3Config(BaseModel):
     secret_access_key: SecretStr = Field(..., example="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
     s3_bucket_path: str = Field("", example="exports/")
     format: Dict[str, Any] = Field(
-        default={"format_type": "Parquet", "flattening": "Root level flattening"},
-        example={"format_type": "Parquet", "flattening": "Root level flattening"},
+        default={"format_type": "Parquet", "flattening": "No flattening"},
+        example={"format_type": "Parquet", "flattening": "No flattening"},
     )
     destinationType: str = Field("s3", example="s3")
 
