@@ -399,6 +399,8 @@ print(f"   Model name: {model_name}")
                 # Prepare environment for script execution
                 env = os.environ.copy()
                 env["MLFLOW_TRACKING_URI"] = self.mlflow_tracking_uri
+                env["MLFLOW_ENABLE_SYSTEM_METRICS_LOGGING"] = "false"
+                env["MLFLOW_ENABLE_PROXY_MLMODEL_ARTIFACT_LOGGING"] = "false"
                 env["EXPERIMENT_NAME"] = experiment_name
                 env["MODEL_NAME"] = model_name
                 env.update(env_vars)
