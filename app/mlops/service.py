@@ -499,6 +499,17 @@ print(f"   To save your model: pickle.dump(model, open(MODEL_PATH, 'wb'))")
     def _build_docker_image(self, model_name, model_version, run_id, image_uri, aws_region, model_path=None):
         """Build Docker image for model inference using Kaniko in Kubernetes."""
         try:
+            from kubernetes import client, config
+            
+            # Load in-cluster config
+            try:
+                config.load_incluster_config()
+            except:
+                config.load_kube_config()
+            
+            v1 = client.CoreV1Api()
+            namespace = os.getenv("NAMESPACE", "asgard")
+            
             print(f"🔨 Building image with Kaniko: {image_uri}")
             
             # Create a unique build context directory
@@ -627,133 +638,113 @@ async def root():
             with open(tar_path, 'rb') as f:
                 tar_content = base64.b64encode(f.read()).decode()
             
-            configmap_yaml = f"""apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: build-context-{build_id}
-  namespace: {namespace}
-data:
-  context.tar.gz: |
-    {tar_content}
-"""
-            
-            # Apply ConfigMap
-            result = subprocess.run(
-                ["kubectl", "apply", "-f", "-"],
-                input=configmap_yaml,
-                text=True,
-                capture_output=True,
-                timeout=30
+            # Create ConfigMap using Kubernetes client
+            configmap = client.V1ConfigMap(
+                metadata=client.V1ObjectMeta(name=f"build-context-{build_id}", namespace=namespace),
+                data={"context.tar.gz": tar_content}
             )
             
-            if result.returncode != 0:
-                print(f"❌ Failed to create ConfigMap: {result.stderr}")
+            try:
+                v1.create_namespaced_config_map(namespace=namespace, body=configmap)
+                print(f"✅ ConfigMap created: build-context-{build_id}")
+            except Exception as cm_error:
+                print(f"❌ Failed to create ConfigMap: {cm_error}")
                 return False
-            
-            print(f"✅ ConfigMap created")
 
-            # Create Kaniko pod for building
-            kaniko_yaml = f"""apiVersion: v1
-kind: Pod
-metadata:
-  name: {kaniko_pod_name}
-  namespace: {namespace}
-spec:
-  restartPolicy: Never
-  initContainers:
-  - name: extract-context
-    image: busybox
-    command:
-    - sh
-    - -c
-    - |
-      cd /workspace
-      base64 -d /config/context.tar.gz > context.tar.gz
-      tar -xzf context.tar.gz
-      ls -la /workspace
-    volumeMounts:
-    - name: workspace
-      mountPath: /workspace
-    - name: build-context
-      mountPath: /config
-  containers:
-  - name: kaniko
-    image: gcr.io/kaniko-project/executor:latest
-    args:
-    - "--context=/workspace"
-    - "--dockerfile=/workspace/Dockerfile"
-    - "--destination={image_uri}"
-    - "--cache=true"
-    - "--compressed-caching=false"
-    env:
-    - name: AWS_ACCESS_KEY_ID
-      value: "{aws_key}"
-    - name: AWS_SECRET_ACCESS_KEY
-      value: "{aws_secret}"
-    - name: AWS_REGION
-      value: "{aws_region}"
-    volumeMounts:
-    - name: workspace
-      mountPath: /workspace
-    - name: kaniko-secret
-      mountPath: /kaniko/.docker
-  volumes:
-  - name: workspace
-    emptyDir: {{}}
-  - name: build-context
-    configMap:
-      name: build-context-{build_id}
-  - name: kaniko-secret
-    secret:
-      secretName: ecr-credentials
-      items:
-      - key: .dockerconfigjson
-        path: config.json
-"""
-
+            # Create Kaniko pod for building using Kubernetes client
             print(f"🚀 Creating Kaniko build pod: {kaniko_pod_name}")
-            result = subprocess.run(
-                ["kubectl", "apply", "-f", "-"],
-                input=kaniko_yaml,
-                text=True,
-                capture_output=True,
-                timeout=30
+            
+            pod = client.V1Pod(
+                metadata=client.V1ObjectMeta(name=kaniko_pod_name, namespace=namespace),
+                spec=client.V1PodSpec(
+                    restart_policy="Never",
+                    init_containers=[
+                        client.V1Container(
+                            name="extract-context",
+                            image="busybox",
+                            command=["sh", "-c", "cd /workspace && base64 -d /config/context.tar.gz > context.tar.gz && tar -xzf context.tar.gz && ls -la /workspace"],
+                            volume_mounts=[
+                                client.V1VolumeMount(name="workspace", mount_path="/workspace"),
+                                client.V1VolumeMount(name="build-context", mount_path="/config")
+                            ]
+                        )
+                    ],
+                    containers=[
+                        client.V1Container(
+                            name="kaniko",
+                            image="gcr.io/kaniko-project/executor:latest",
+                            args=[
+                                "--context=/workspace",
+                                "--dockerfile=/workspace/Dockerfile",
+                                f"--destination={image_uri}",
+                                "--cache=true",
+                                "--compressed-caching=false"
+                            ],
+                            env=[
+                                client.V1EnvVar(name="AWS_ACCESS_KEY_ID", value=aws_key),
+                                client.V1EnvVar(name="AWS_SECRET_ACCESS_KEY", value=aws_secret),
+                                client.V1EnvVar(name="AWS_REGION", value=aws_region)
+                            ],
+                            volume_mounts=[
+                                client.V1VolumeMount(name="workspace", mount_path="/workspace"),
+                                client.V1VolumeMount(name="kaniko-secret", mount_path="/kaniko/.docker")
+                            ]
+                        )
+                    ],
+                    volumes=[
+                        client.V1Volume(name="workspace", empty_dir=client.V1EmptyDirVolumeSource()),
+                        client.V1Volume(
+                            name="build-context",
+                            config_map=client.V1ConfigMapVolumeSource(name=f"build-context-{build_id}")
+                        ),
+                        client.V1Volume(
+                            name="kaniko-secret",
+                            secret=client.V1SecretVolumeSource(
+                                secret_name="ecr-credentials",
+                                items=[client.V1KeyToPath(key=".dockerconfigjson", path="config.json")]
+                            )
+                        )
+                    ]
+                )
             )
-
-            if result.returncode != 0:
-                print(f"❌ Failed to create Kaniko pod: {result.stderr}")
+            
+            try:
+                v1.create_namespaced_pod(namespace=namespace, body=pod)
+                print(f"✅ Kaniko pod created, waiting for build to complete...")
+            except Exception as pod_error:
+                print(f"❌ Failed to create Kaniko pod: {pod_error}")
                 return False
-
-            print(f"✅ Kaniko pod created, waiting for build to complete...")
 
             # Wait for pod to complete (max 10 minutes)
             for i in range(120):
                 time.sleep(5)
-                result = subprocess.run(
-                    ["kubectl", "get", "pod", kaniko_pod_name, "-n", namespace, "-o", "jsonpath={.status.phase}"],
-                    capture_output=True,
-                    text=True,
-                    timeout=10
-                )
                 
-                phase = result.stdout.strip()
-                print(f"⏳ Build status: {phase} ({i*5}s elapsed)")
-                
-                if phase == "Succeeded":
-                    print(f"✅ Image built successfully!")
-                    # Cleanup
-                    subprocess.run(["kubectl", "delete", "pod", kaniko_pod_name, "-n", namespace], capture_output=True)
-                    subprocess.run(["kubectl", "delete", "configmap", f"build-context-{build_id}", "-n", namespace], capture_output=True)
-                    return True
-                elif phase == "Failed":
-                    # Get logs
-                    logs_result = subprocess.run(
-                        ["kubectl", "logs", kaniko_pod_name, "-n", namespace],
-                        capture_output=True,
-                        text=True
-                    )
-                    print(f"❌ Build failed! Logs:\n{logs_result.stdout}\n{logs_result.stderr}")
-                    return False
+                try:
+                    pod_status = v1.read_namespaced_pod_status(name=kaniko_pod_name, namespace=namespace)
+                    phase = pod_status.status.phase
+                    
+                    print(f"⏳ Build status: {phase} ({i*5}s elapsed)")
+                    
+                    if phase == "Succeeded":
+                        print(f"✅ Image built and pushed successfully!")
+                        # Cleanup
+                        try:
+                            v1.delete_namespaced_pod(name=kaniko_pod_name, namespace=namespace)
+                            v1.delete_namespaced_config_map(name=f"build-context-{build_id}", namespace=namespace)
+                        except:
+                            pass
+                        return True
+                    elif phase == "Failed":
+                        # Get logs
+                        try:
+                            logs = v1.read_namespaced_pod_log(name=kaniko_pod_name, namespace=namespace)
+                            print(f"❌ Build failed! Logs:\n{logs}")
+                        except:
+                            print(f"❌ Build failed but couldn't retrieve logs")
+                        return False
+                except Exception as status_error:
+                    print(f"⚠️  Error checking pod status: {status_error}")
+                    continue
 
             print(f"❌ Build timed out after 10 minutes")
             return False
@@ -774,152 +765,112 @@ spec:
     ):
         """Deploy to Kubernetes and return external IP."""
         try:
+            from kubernetes import client, config
+            
+            # Load in-cluster config
+            try:
+                config.load_incluster_config()
+            except:
+                config.load_kube_config()
+            
+            apps_v1 = client.AppsV1Api()
+            core_v1 = client.CoreV1Api()
+            
             deployment_name = f"{model_name.replace('_', '-')}-inference"
             service_name = f"{model_name.replace('_', '-')}-service"
 
-            # Create AWS credentials secret
-            aws_key = os.getenv("AWS_ACCESS_KEY_ID")
-            aws_secret = os.getenv("AWS_SECRET_ACCESS_KEY")
-
-            if aws_key and aws_secret:
-                subprocess.run(
-                    [
-                        "kubectl",
-                        "create",
-                        "secret",
-                        "generic",
-                        "aws-credentials",
-                        f"--from-literal=AWS_ACCESS_KEY_ID={aws_key}",
-                        f"--from-literal=AWS_SECRET_ACCESS_KEY={aws_secret}",
-                        f"--namespace={namespace}",
-                        "--dry-run=client",
-                        "-o",
-                        "yaml",
-                    ],
-                    capture_output=True,
-                )
-
-                subprocess.run(
-                    ["kubectl", "apply", "-f", "-"],
-                    input=f"""apiVersion: v1
-kind: Secret
-metadata:
-  name: aws-credentials
-  namespace: {namespace}
-type: Opaque
-stringData:
-  AWS_ACCESS_KEY_ID: {aws_key}
-  AWS_SECRET_ACCESS_KEY: {aws_secret}
-""",
-                    text=True,
-                    capture_output=True,
-                )
+            print(f"☸️  Creating deployment: {deployment_name}")
 
             # Create deployment
-            deployment_yaml = f"""apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: {deployment_name}
-  namespace: {namespace}
-spec:
-  replicas: {replicas}
-  selector:
-    matchLabels:
-      app: {deployment_name}
-  template:
-    metadata:
-      labels:
-        app: {deployment_name}
-    spec:
-      imagePullSecrets:
-      - name: ecr-credentials
-      containers:
-      - name: inference
-        image: {image_uri}
-        ports:
-        - containerPort: 80
-        env:
-        - name: AWS_ACCESS_KEY_ID
-          valueFrom:
-            secretKeyRef:
-              name: aws-credentials
-              key: AWS_ACCESS_KEY_ID
-              optional: true
-        - name: AWS_SECRET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: aws-credentials
-              key: AWS_SECRET_ACCESS_KEY
-              optional: true
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "250m"
-          limits:
-            memory: "1Gi"
-            cpu: "1000m"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 80
-          initialDelaySeconds: 60
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 80
-          initialDelaySeconds: 30
-          periodSeconds: 5
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: {service_name}
-  namespace: {namespace}
-spec:
-  type: LoadBalancer
-  selector:
-    app: {deployment_name}
-  ports:
-  - port: 80
-    targetPort: 80
-    protocol: TCP
-"""
-
-            # Apply deployment
-            subprocess.run(
-                ["kubectl", "apply", "-f", "-"],
-                input=deployment_yaml,
-                text=True,
-                capture_output=True,
-                timeout=30,
+            deployment = client.V1Deployment(
+                metadata=client.V1ObjectMeta(name=deployment_name, namespace=namespace),
+                spec=client.V1DeploymentSpec(
+                    replicas=replicas,
+                    selector=client.V1LabelSelector(
+                        match_labels={"app": deployment_name}
+                    ),
+                    template=client.V1PodTemplateSpec(
+                        metadata=client.V1ObjectMeta(labels={"app": deployment_name}),
+                        spec=client.V1PodSpec(
+                            image_pull_secrets=[client.V1LocalObjectReference(name="ecr-credentials")],
+                            containers=[
+                                client.V1Container(
+                                    name="inference",
+                                    image=image_uri,
+                                    ports=[client.V1ContainerPort(container_port=80)],
+                                    resources=client.V1ResourceRequirements(
+                                        requests={"memory": "512Mi", "cpu": "250m"},
+                                        limits={"memory": "1Gi", "cpu": "1000m"}
+                                    ),
+                                    liveness_probe=client.V1Probe(
+                                        http_get=client.V1HTTPGetAction(path="/health", port=80),
+                                        initial_delay_seconds=60,
+                                        period_seconds=10
+                                    ),
+                                    readiness_probe=client.V1Probe(
+                                        http_get=client.V1HTTPGetAction(path="/health", port=80),
+                                        initial_delay_seconds=30,
+                                        period_seconds=5
+                                    )
+                                )
+                            ]
+                        )
+                    )
+                )
             )
 
-            # Wait for external IP (max 3 minutes)
-            for _ in range(36):
-                time.sleep(5)
-                result = subprocess.run(
-                    [
-                        "kubectl",
-                        "get",
-                        "svc",
-                        service_name,
-                        "-n",
-                        namespace,
-                        "-o",
-                        "jsonpath={.status.loadBalancer.ingress[0].ip}",
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
+            try:
+                apps_v1.create_namespaced_deployment(namespace=namespace, body=deployment)
+                print(f"✅ Deployment created: {deployment_name}")
+            except Exception as deploy_error:
+                print(f"❌ Failed to create deployment: {deploy_error}")
+                return None
+
+            # Create LoadBalancer service
+            print(f"🌐 Creating LoadBalancer service: {service_name}")
+            
+            service = client.V1Service(
+                metadata=client.V1ObjectMeta(name=service_name, namespace=namespace),
+                spec=client.V1ServiceSpec(
+                    type="LoadBalancer",
+                    selector={"app": deployment_name},
+                    ports=[client.V1ServicePort(port=80, target_port=80, protocol="TCP")]
                 )
+            )
 
-                external_ip = result.stdout.strip()
-                if external_ip and external_ip != "<pending>":
-                    return external_ip
+            try:
+                core_v1.create_namespaced_service(namespace=namespace, body=service)
+                print(f"✅ Service created: {service_name}")
+            except Exception as svc_error:
+                print(f"❌ Failed to create service: {svc_error}")
+                return None
 
+            # Wait for external IP (max 3 minutes)
+            print(f"⏳ Waiting for external IP assignment...")
+            for i in range(36):
+                time.sleep(5)
+                
+                try:
+                    svc_status = core_v1.read_namespaced_service(name=service_name, namespace=namespace)
+                    
+                    if svc_status.status.load_balancer.ingress:
+                        external_ip = svc_status.status.load_balancer.ingress[0].ip
+                        if external_ip:
+                            print(f"✅ External IP assigned: {external_ip}")
+                            return external_ip
+                    
+                    print(f"⏳ Waiting for IP... ({i*5}s elapsed)")
+                except Exception as ip_error:
+                    print(f"⚠️  Error checking service status: {ip_error}")
+                    continue
+
+            print(f"⚠️  External IP not assigned within timeout, but deployment created")
             return None
 
         except Exception as e:
-            print(f"Deploy error: {e}")
+            print(f"❌ Deploy error: {e}")
+            import traceback
+            traceback.print_exc()
             return None
+
+
