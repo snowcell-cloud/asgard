@@ -497,21 +497,30 @@ print(f"   To save your model: pickle.dump(model, open(MODEL_PATH, 'wb'))")
             raise
 
     def _build_docker_image(self, model_name, model_version, run_id, image_uri, aws_region, model_path=None):
-        """Build Docker image for model inference."""
+        """Build Docker image for model inference using Kaniko in Kubernetes."""
         try:
-            with tempfile.TemporaryDirectory() as tmpdir:
-                tmpdir_path = Path(tmpdir)
+            print(f"🔨 Building image with Kaniko: {image_uri}")
+            
+            # Create a unique build context directory
+            build_id = run_id[:8]
+            build_context_path = f"/tmp/build_context_{build_id}"
+            Path(build_context_path).mkdir(exist_ok=True)
+            
+            tmpdir_path = Path(build_context_path)
 
-                # Copy model file to build context
-                if model_path and Path(model_path).exists():
-                    import shutil
-                    shutil.copy(model_path, tmpdir_path / "model.pkl")
-                    print(f"✅ Copied model from {model_path} to build context")
+            # Copy model file to build context
+            if model_path and Path(model_path).exists():
+                import shutil
+                shutil.copy(model_path, tmpdir_path / "model.pkl")
+                print(f"✅ Copied model from {model_path} to build context")
+            else:
+                print(f"⚠️  No model path provided or file doesn't exist: {model_path}")
+                return False
 
-                # Create Dockerfile (minimal, no MLflow)
-                dockerfile = tmpdir_path / "Dockerfile"
-                dockerfile.write_text(
-                    f"""FROM python:3.11-slim as builder
+            # Create Dockerfile (minimal, no MLflow)
+            dockerfile = tmpdir_path / "Dockerfile"
+            dockerfile.write_text(
+                f"""FROM python:3.11-slim as builder
 RUN pip install --no-cache-dir --user fastapi==0.104.1 uvicorn[standard]==0.24.0 scikit-learn==1.3.2 pandas==2.1.3 numpy==1.26.2 python-multipart==0.0.6
 
 FROM python:3.11-slim
@@ -526,12 +535,12 @@ COPY model.pkl /app/
 EXPOSE 80
 CMD ["uvicorn", "inference_service:app", "--host", "0.0.0.0", "--port", "80"]
 """
-                )
+            )
 
-                # Create inference service (pickle-based, no MLflow)
-                inference_service = tmpdir_path / "inference_service.py"
-                inference_service.write_text(
-                    """import os
+            # Create inference service (pickle-based, no MLflow)
+            inference_service = tmpdir_path / "inference_service.py"
+            inference_service.write_text(
+                """import os
 import logging
 import pickle
 from fastapi import FastAPI, HTTPException
@@ -590,59 +599,175 @@ async def predict(request: PredictRequest):
 async def root():
     return {"service": "Model Inference API (Pickle)", "model": model_name, "version": model_version}
 """
-                )
+            )
 
-                # Build image
-                result = subprocess.run(
-                    ["docker", "build", "-t", image_uri, "."],
-                    cwd=tmpdir,
-                    capture_output=True,
-                    text=True,
-                    timeout=300,
-                )
+            # Create tar archive of build context for Kaniko
+            import tarfile
+            tar_path = f"/tmp/build_context_{build_id}.tar.gz"
+            print(f"📦 Creating build context archive: {tar_path}")
+            
+            with tarfile.open(tar_path, "w:gz") as tar:
+                tar.add(tmpdir_path, arcname=".")
+            
+            print(f"✅ Build context created: {tar_path}")
 
-                return result.returncode == 0
-
-        except Exception as e:
-            print(f"Build error: {e}")
-            return False
-
-    def _push_to_ecr(self, image_uri, ecr_registry, aws_region):
-        """Push Docker image to ECR."""
-        try:
-            # ECR login
+            # Create Kaniko build pod
+            namespace = os.getenv("NAMESPACE", "asgard")
+            kaniko_pod_name = f"kaniko-build-{build_id}"
+            
+            # Get AWS credentials for ECR
+            aws_key = os.getenv("AWS_ACCESS_KEY_ID", "")
+            aws_secret = os.getenv("AWS_SECRET_ACCESS_KEY", "")
+            
+            # Create ConfigMap with build context
+            print(f"📤 Creating ConfigMap with build context...")
+            
+            # Read tar content as base64
+            import base64
+            with open(tar_path, 'rb') as f:
+                tar_content = base64.b64encode(f.read()).decode()
+            
+            configmap_yaml = f"""apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: build-context-{build_id}
+  namespace: {namespace}
+data:
+  context.tar.gz: |
+    {tar_content}
+"""
+            
+            # Apply ConfigMap
             result = subprocess.run(
-                ["aws", "ecr", "get-login-password", "--region", aws_region],
-                capture_output=True,
+                ["kubectl", "apply", "-f", "-"],
+                input=configmap_yaml,
                 text=True,
-                timeout=30,
+                capture_output=True,
+                timeout=30
+            )
+            
+            if result.returncode != 0:
+                print(f"❌ Failed to create ConfigMap: {result.stderr}")
+                return False
+            
+            print(f"✅ ConfigMap created")
+
+            # Create Kaniko pod for building
+            kaniko_yaml = f"""apiVersion: v1
+kind: Pod
+metadata:
+  name: {kaniko_pod_name}
+  namespace: {namespace}
+spec:
+  restartPolicy: Never
+  initContainers:
+  - name: extract-context
+    image: busybox
+    command:
+    - sh
+    - -c
+    - |
+      cd /workspace
+      base64 -d /config/context.tar.gz > context.tar.gz
+      tar -xzf context.tar.gz
+      ls -la /workspace
+    volumeMounts:
+    - name: workspace
+      mountPath: /workspace
+    - name: build-context
+      mountPath: /config
+  containers:
+  - name: kaniko
+    image: gcr.io/kaniko-project/executor:latest
+    args:
+    - "--context=/workspace"
+    - "--dockerfile=/workspace/Dockerfile"
+    - "--destination={image_uri}"
+    - "--cache=true"
+    - "--compressed-caching=false"
+    env:
+    - name: AWS_ACCESS_KEY_ID
+      value: "{aws_key}"
+    - name: AWS_SECRET_ACCESS_KEY
+      value: "{aws_secret}"
+    - name: AWS_REGION
+      value: "{aws_region}"
+    volumeMounts:
+    - name: workspace
+      mountPath: /workspace
+    - name: kaniko-secret
+      mountPath: /kaniko/.docker
+  volumes:
+  - name: workspace
+    emptyDir: {{}}
+  - name: build-context
+    configMap:
+      name: build-context-{build_id}
+  - name: kaniko-secret
+    secret:
+      secretName: ecr-credentials
+      items:
+      - key: .dockerconfigjson
+        path: config.json
+"""
+
+            print(f"🚀 Creating Kaniko build pod: {kaniko_pod_name}")
+            result = subprocess.run(
+                ["kubectl", "apply", "-f", "-"],
+                input=kaniko_yaml,
+                text=True,
+                capture_output=True,
+                timeout=30
             )
 
             if result.returncode != 0:
+                print(f"❌ Failed to create Kaniko pod: {result.stderr}")
                 return False
 
-            password = result.stdout.strip()
+            print(f"✅ Kaniko pod created, waiting for build to complete...")
 
-            subprocess.run(
-                ["docker", "login", "--username", "AWS", "--password-stdin", ecr_registry],
-                input=password,
-                text=True,
-                timeout=30,
-            )
+            # Wait for pod to complete (max 10 minutes)
+            for i in range(120):
+                time.sleep(5)
+                result = subprocess.run(
+                    ["kubectl", "get", "pod", kaniko_pod_name, "-n", namespace, "-o", "jsonpath={.status.phase}"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                
+                phase = result.stdout.strip()
+                print(f"⏳ Build status: {phase} ({i*5}s elapsed)")
+                
+                if phase == "Succeeded":
+                    print(f"✅ Image built successfully!")
+                    # Cleanup
+                    subprocess.run(["kubectl", "delete", "pod", kaniko_pod_name, "-n", namespace], capture_output=True)
+                    subprocess.run(["kubectl", "delete", "configmap", f"build-context-{build_id}", "-n", namespace], capture_output=True)
+                    return True
+                elif phase == "Failed":
+                    # Get logs
+                    logs_result = subprocess.run(
+                        ["kubectl", "logs", kaniko_pod_name, "-n", namespace],
+                        capture_output=True,
+                        text=True
+                    )
+                    print(f"❌ Build failed! Logs:\n{logs_result.stdout}\n{logs_result.stderr}")
+                    return False
 
-            # Push image
-            result = subprocess.run(
-                ["docker", "push", image_uri],
-                capture_output=True,
-                text=True,
-                timeout=600,
-            )
-
-            return result.returncode == 0
+            print(f"❌ Build timed out after 10 minutes")
+            return False
 
         except Exception as e:
-            print(f"Push error: {e}")
+            print(f"❌ Build error: {e}")
+            import traceback
+            traceback.print_exc()
             return False
+
+    def _push_to_ecr(self, image_uri, ecr_registry, aws_region):
+        """Push Docker image to ECR - handled by Kaniko, this is a no-op."""
+        print(f"✅ Image already pushed to ECR by Kaniko: {image_uri}")
+        return True
 
     def _deploy_to_k8s(
         self, model_name, model_version, run_id, image_uri, namespace, replicas, aws_region
