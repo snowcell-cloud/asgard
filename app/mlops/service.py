@@ -349,6 +349,9 @@ from mlflow.tracking import MlflowClient
 
 # MLflow configuration
 os.environ['MLFLOW_TRACKING_URI'] = '{self.mlflow_tracking_uri}'
+os.environ['MLFLOW_ENABLE_SYSTEM_METRICS_LOGGING'] = 'false'
+os.environ['MLFLOW_ENABLE_PROXY_MLMODEL_ARTIFACT_LOGGING'] = 'false'
+
 mlflow.set_tracking_uri('{self.mlflow_tracking_uri}')
 mlflow.set_experiment('{experiment_name}')
 
