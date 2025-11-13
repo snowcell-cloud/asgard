@@ -1,51 +1,81 @@
 # ML Model Deployment Pipeline
 
-Complete end-to-end ML model deployment solution with **Feast feature store**, **MLflow**, and **EKS**.
+Complete end-to-end ML model deployment solution with **single-click deployment** via the MLOps API.
+
+## 🚀 Quick Start - Single Click Deployment
+
+The easiest way to deploy a model is using the `/mlops/deploy` API endpoint. It handles everything:
+
+```bash
+# 1. Create your training script (example_train.py)
+# 2. Encode and deploy in one command
+python encode_script.py example_train.py --deploy --model-name my_model > request.json
+
+# 3. Deploy
+curl -X POST "http://localhost:8000/mlops/deploy" \
+  -H "Content-Type: application/json" \
+  -d @request.json
+
+# Response includes inference URL - ready to use immediately!
+{
+  "inference_url": "http://51.89.136.142",
+  "endpoints": {
+    "predict": "http://51.89.136.142/predict",
+    "health": "http://51.89.136.142/health"
+  }
+}
+```
+
+**That's it!** Your model is trained, containerized, and deployed to Kubernetes with a LoadBalancer.
 
 ## 📋 Overview
 
 This deployment pipeline enables you to:
 
-1. ✅ Train ML models using features from Feast feature store
-2. ✅ Track experiments and models with MLflow
-3. ✅ Build production-ready Docker images
-4. ✅ Deploy to AWS EKS with auto-scaling
-5. ✅ Expose inference endpoints (REST API)
+1. ✅ **Train** ML models using custom Python scripts
+2. ✅ **Track** experiments and models with MLflow
+3. ✅ **Build** production-ready Docker images automatically
+4. ✅ **Deploy** to Kubernetes with LoadBalancer
+5. ✅ **Expose** inference endpoints (REST API)
+6. ✅ **Scale** automatically with Kubernetes HPA
 
 ## 🏗️ Architecture
 
 ```
 ┌─────────────┐      ┌─────────────┐      ┌─────────────┐
-│   Feast     │─────▶│   Training  │─────▶│   MLflow    │
-│ Feature     │      │   Script    │      │  Registry   │
-│   Store     │      └─────────────┘      └─────────────┘
-└─────────────┘              │                     │
+│   Training  │      │   MLflow    │      │   Docker    │
+│   Script    │─────▶│  Tracking   │─────▶│   Build     │
+│  (Upload)   │      │  + Registry │      │  (Auto)     │
+└─────────────┘      └─────────────┘      └─────────────┘
+                             │                     │
                              │                     │
                              ▼                     ▼
                       ┌─────────────┐      ┌─────────────┐
-                      │   Docker    │      │   Model     │
-                      │   Image     │◀─────│  Artifacts  │
+                      │   Model     │      │     ECR     │
+                      │  Artifacts  │      │   Push      │
                       └─────────────┘      └─────────────┘
-                             │
-                             ▼
-                      ┌─────────────┐
-                      │     EKS     │
-                      │  Deployment │
-                      └─────────────┘
-                             │
-                             ▼
-                      ┌─────────────┐
-                      │  Inference  │
-                      │     API     │
-                      └─────────────┘
+                                                   │
+                                                   ▼
+                                            ┌─────────────┐
+                                            │ Kubernetes  │
+                                            │  Deploy     │
+                                            └─────────────┘
+                                                   │
+                                                   ▼
+                                            ┌─────────────┐
+                                            │LoadBalancer │
+                                            │ External IP │
+                                            └─────────────┘
 ```
 
 ## 📁 Project Structure
 
 ```
 ml_deployment/
+├── example_train.py              # Example training script
+├── encode_script.py              # Helper to encode scripts for deployment
 ├── train_with_feast.py          # Training script with Feast integration
-├── inference_service.py          # FastAPI inference service
+├── inference_service.py          # FastAPI inference service (auto-created)
 ├── requirements.txt              # Python dependencies
 ├── Dockerfile.inference          # Multi-stage production Dockerfile
 ├── deploy.sh                     # End-to-end deployment automation
@@ -54,7 +84,187 @@ ml_deployment/
 └── README.md                     # This file
 ```
 
+## 🎯 How It Works - Single Click Deployment
+
+### The `/mlops/deploy` API Endpoint
+
+This endpoint handles the entire deployment lifecycle in one synchronous call:
+
+**Request:**
+
+```json
+{
+  "script_name": "train.py",
+  "script_content": "<base64-encoded-script>",
+  "experiment_name": "production",
+  "model_name": "customer_churn_model",
+  "requirements": ["scikit-learn==1.3.2", "pandas", "numpy"],
+  "timeout": 300,
+  "replicas": 2,
+  "namespace": "asgard"
+}
+```
+
+**What happens (automatically):**
+
+1. **Training** (1-2 min)
+
+   - Decodes your training script
+   - Injects MLflow configuration
+   - Installs requirements
+   - Executes training script
+   - Registers model in MLflow
+
+2. **Docker Build** (1-2 min)
+
+   - Creates optimized multi-stage Dockerfile
+   - Builds inference service image
+   - Tags with model version
+
+3. **Push to ECR** (30 sec)
+
+   - Authenticates with AWS ECR
+   - Pushes Docker image
+
+4. **K8s Deployment** (1-2 min)
+   - Creates Deployment and Service
+   - Provisions LoadBalancer
+   - Waits for external IP
+   - Configures health checks
+
+**Response (after ~3-5 minutes):**
+
+```json
+{
+  "status": "deployed",
+  "inference_url": "http://51.89.136.142",
+  "external_ip": "51.89.136.142",
+  "model_version": "1",
+  "run_id": "abc123...",
+  "endpoints": {
+    "predict": "http://51.89.136.142/predict",
+    "health": "http://51.89.136.142/health",
+    "metadata": "http://51.89.136.142/metadata"
+  },
+  "deployment_time_seconds": 245.3
+}
+```
+
 ## 🚀 Quick Start
+
+### Option 1: Using the Helper Script (Easiest)
+
+```bash
+# 1. Write your training script (see example_train.py)
+# 2. Encode and create deployment request
+python ml_deployment/encode_script.py example_train.py \
+  --deploy \
+  --model-name customer_churn \
+  --experiment-name production \
+  --requirements scikit-learn pandas numpy \
+  --timeout 300 \
+  --replicas 2 > deploy_request.json
+
+# 3. Deploy
+curl -X POST "http://localhost:8000/mlops/deploy" \
+  -H "Content-Type: application/json" \
+  -d @deploy_request.json
+
+# 4. Use the inference URL from the response
+curl -X POST "http://51.89.136.142/predict" \
+  -H "Content-Type: application/json" \
+  -d '{"inputs": {"feature1": [1.0], "feature2": [2.0]}}'
+```
+
+### Option 2: Manual Encoding
+
+```bash
+# Encode your script
+cat ml_deployment/example_train.py | base64 > encoded_script.txt
+
+# Create request manually
+cat > deploy_request.json << 'EOF'
+{
+  "script_name": "example_train.py",
+  "script_content": "PASTE_BASE64_HERE",
+  "experiment_name": "production",
+  "model_name": "customer_churn",
+  "requirements": ["scikit-learn==1.3.2", "pandas==2.1.3", "numpy==1.26.2"],
+  "timeout": 300,
+  "replicas": 2,
+  "namespace": "asgard"
+}
+EOF
+
+# Deploy
+curl -X POST "http://localhost:8000/mlops/deploy" \
+  -H "Content-Type: application/json" \
+  -d @deploy_request.json
+```
+
+### Option 3: Using Python
+
+```python
+import base64
+import requests
+
+# Read and encode script
+with open('ml_deployment/example_train.py', 'rb') as f:
+    script_content = base64.b64encode(f.read()).decode()
+
+# Create request
+request = {
+    "script_name": "example_train.py",
+    "script_content": script_content,
+    "experiment_name": "production",
+    "model_name": "customer_churn",
+    "requirements": ["scikit-learn==1.3.2", "pandas==2.1.3", "numpy==1.26.2"],
+    "timeout": 300,
+    "replicas": 2,
+    "namespace": "asgard"
+}
+
+# Deploy
+response = requests.post(
+    "http://localhost:8000/mlops/deploy",
+    json=request,
+    timeout=600  # Wait for complete deployment
+)
+
+result = response.json()
+print(f"Model deployed at: {result['inference_url']}")
+```
+
+## 📝 Training Script Requirements
+
+Your training script **MUST**:
+
+1. ✅ Import and use MLflow
+2. ✅ Call `mlflow.start_run()` to create a run
+3. ✅ Train your model
+4. ✅ Call `mlflow.<framework>.log_model(model, 'model')` to save the model
+
+**Minimal Example:**
+
+```python
+import mlflow
+import mlflow.sklearn
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.datasets import make_classification
+
+# Create data
+X, y = make_classification(n_samples=1000, n_features=20)
+
+# Train and log
+with mlflow.start_run():
+    model = RandomForestClassifier()
+    model.fit(X, y)
+    mlflow.sklearn.log_model(model, 'model')  # REQUIRED!
+```
+
+See [`example_train.py`](./example_train.py) for a complete example and [`../docs/EXAMPLE_TRAINING_SCRIPT.md`](../docs/EXAMPLE_TRAINING_SCRIPT.md) for more examples.
+
+## 🔧 Prerequisites for Manual Deployment
 
 ### Prerequisites
 
@@ -72,7 +282,7 @@ export AWS_ACCESS_KEY_ID="your-key"
 export AWS_SECRET_ACCESS_KEY="your-secret"
 ```
 
-### One-Command Deployment
+### One-Command Manual Deployment (Legacy)
 
 ```bash
 # Complete end-to-end deployment

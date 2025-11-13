@@ -177,24 +177,75 @@ class MLOpsService:
         # STEP 1: Train model
         print(f"📚 [1/4] Training model...")
 
+        # Decode script content (handle both base64 and plain text)
         try:
+            print(f"🔍 Attempting to decode script_content (length: {len(request.script_content)})")
+            # Try base64 decode first
             script_bytes = base64.b64decode(request.script_content)
             script_text = script_bytes.decode("utf-8")
-        except:
+            print(f"✅ Script decoded from base64 (decoded length: {len(script_text)})")
+        except Exception as decode_error:
+            # If decode fails, assume it's already plain text
+            print(f"⚠️  Base64 decode failed, using as plain text: {decode_error}")
             script_text = request.script_content
+        
+        print(f"📝 Script preview (first 200 chars):\n{script_text[:200]}...")
 
-        training_result = self._run_training_sync(
-            script_text,
-            request.experiment_name,
-            request.model_name,
-            request.requirements or [],
-            request.environment_vars or {},
-            request.timeout,
-            request.tags or {},
-        )
+        try:
+            training_result = self._run_training_sync(
+                script_text,
+                request.experiment_name,
+                request.model_name,
+                request.requirements or [],
+                request.environment_vars or {},
+                request.timeout,
+                request.tags or {},
+            )
+        except Exception as training_error:
+            import traceback
+
+            error_detail = traceback.format_exc()
+            error_msg = f"Training failed: {str(training_error)}"
+            print(f"❌ {error_msg}")
+            print(f"❌ Full traceback:\n{error_detail}")
+            
+            # Create detailed error message
+            full_error_msg = (
+                f"Training Failed\n\n"
+                f"Error: {str(training_error)}\n\n"
+                f"Make sure your training script:\n"
+                f"1. Calls mlflow.start_run() to create a run\n"
+                f"2. Trains your model\n"
+                f"3. Logs the model with mlflow.<framework>.log_model(model, 'model')\n"
+                f"4. Example frameworks: sklearn, xgboost, tensorflow, pytorch\n\n"
+                f"Traceback:\n{error_detail}"
+            )
+            
+            raise HTTPException(status_code=500, detail=full_error_msg)
 
         if not training_result or not training_result.get("run_id"):
-            raise HTTPException(status_code=500, detail="Training failed")
+            error_msg = (
+                "Training completed but no MLflow run was created.\n\n"
+                "Your script MUST:\n"
+                "1. Call mlflow.start_run() to start tracking\n"
+                "2. Train your model\n"
+                "3. Log the model with mlflow.<framework>.log_model(model, 'model')\n"
+                "   Examples: mlflow.sklearn.log_model(), mlflow.xgboost.log_model()\n"
+                "4. End the run with mlflow.end_run() or use context manager\n\n"
+                "Example script:\n"
+                "  import mlflow\n"
+                "  import mlflow.sklearn\n"
+                "  from sklearn.ensemble import RandomForestClassifier\n\n"
+                "  with mlflow.start_run():\n"
+                "      model = RandomForestClassifier(n_estimators=100)\n"
+                "      model.fit(X_train, y_train)\n"
+                "      mlflow.sklearn.log_model(model, 'model')\n"
+                "      mlflow.log_params({'n_estimators': 100})\n"
+                "      accuracy = model.score(X_test, y_test)\n"
+                "      mlflow.log_metric('accuracy', accuracy)\n"
+            )
+            print(f"❌ {error_msg}")
+            raise HTTPException(status_code=500, detail=error_msg)
 
         run_id = training_result["run_id"]
         model_version = training_result.get("version", "1")
@@ -275,42 +326,88 @@ class MLOpsService:
         self, script_text, experiment_name, model_name, requirements, env_vars, timeout, tags
     ):
         """Run training synchronously and return result."""
-        try:
-            with tempfile.TemporaryDirectory() as tmpdir:
-                script_path = Path(tmpdir) / "train.py"
+        print(f"🔍 _run_training_sync called:")
+        print(f"   Experiment: {experiment_name}")
+        print(f"   Model: {model_name}")
+        print(f"   Requirements: {requirements}")
+        print(f"   Timeout: {timeout}")
+        print(f"   Tags: {tags}")
 
-                # Inject MLflow configuration
-                injected_script = f"""
+        try:
+            print(f"🔍 Creating temp directory...")
+            with tempfile.TemporaryDirectory() as tmpdir:
+                print(f"🔍 Temp dir created: {tmpdir}")
+                script_path = Path(tmpdir) / "train.py"
+                print(f"🔍 Script path: {script_path}")
+
+                # Inject MLflow configuration at the beginning
+                injected_script = f"""# Auto-injected MLflow configuration
 import os
 import sys
 import mlflow
+from mlflow.tracking import MlflowClient
 
 # MLflow configuration
 os.environ['MLFLOW_TRACKING_URI'] = '{self.mlflow_tracking_uri}'
 mlflow.set_tracking_uri('{self.mlflow_tracking_uri}')
 mlflow.set_experiment('{experiment_name}')
 
-# User-provided environment variables
-"""
-                for key, value in env_vars.items():
-                    injected_script += f"os.environ['{key}'] = '{value}'\n"
+print(f"✅ MLflow configured:")
+print(f"   Tracking URI: {self.mlflow_tracking_uri}")
+print(f"   Experiment: {experiment_name}")
+print(f"   Model name: {model_name}")
 
-                injected_script += "\n# User script\n" + script_text
+"""
+                # Add user-provided environment variables
+                if env_vars:
+                    injected_script += "# User-provided environment variables\n"
+                    for key, value in env_vars.items():
+                        injected_script += f"os.environ['{key}'] = '{value}'\n"
+                    injected_script += "\n"
+
+                # Add the user's script
+                injected_script += "# ========== User Training Script ==========\n"
+                injected_script += script_text
+                
+                # Write the complete script
                 script_path.write_text(injected_script)
 
-                # Install requirements
+                print(f"📝 Training script written to: {script_path}")
+                print(f"� Full script content:\n{'='*60}")
+                print(injected_script)
+                print(f"{'='*60}\n")
+
+                # Install requirements if provided
                 if requirements:
-                    subprocess.run(
+                    print(f"📦 Installing {len(requirements)} requirements: {requirements}")
+                    pip_result = subprocess.run(
                         ["pip", "install", "--quiet", "--no-cache-dir"] + requirements,
+                        capture_output=True,
+                        text=True,
                         timeout=120,
                         cwd=tmpdir,
                     )
+                    if pip_result.returncode != 0:
+                        error_msg = f"Failed to install requirements: {pip_result.stderr}"
+                        print(f"❌ {error_msg}")
+                        raise Exception(error_msg)
+                    print(f"✅ Requirements installed successfully")
 
-                # Execute script
+                # Prepare environment for script execution
                 env = os.environ.copy()
                 env["MLFLOW_TRACKING_URI"] = self.mlflow_tracking_uri
+                env["EXPERIMENT_NAME"] = experiment_name
+                env["MODEL_NAME"] = model_name
                 env.update(env_vars)
 
+                print(f"🏃 Executing training script with timeout={timeout}s...")
+                print(
+                    f"   Python: {subprocess.run(['which', 'python'], capture_output=True, text=True).stdout.strip()}"
+                )
+                print(f"   Working dir: {tmpdir}")
+                print(f"   Environment vars: MLFLOW_TRACKING_URI, EXPERIMENT_NAME, MODEL_NAME + {len(env_vars)} custom vars")
+
+                # Execute the training script
                 result = subprocess.run(
                     ["python", str(script_path)],
                     capture_output=True,
@@ -320,35 +417,155 @@ mlflow.set_experiment('{experiment_name}')
                     env=env,
                 )
 
-                if result.returncode == 0:
-                    # Get latest run
-                    experiment = mlflow.get_experiment_by_name(experiment_name)
-                    if experiment:
-                        runs = mlflow.search_runs(
-                            experiment_ids=[experiment.experiment_id],
-                            order_by=["start_time DESC"],
-                            max_results=1,
+                print(f"\n{'='*60}")
+                print(f"Script execution completed: returncode={result.returncode}")
+                print(f"{'='*60}")
+                
+                if result.stdout:
+                    print(f"STDOUT:\n{result.stdout}")
+                
+                if result.stderr:
+                    print(f"STDERR:\n{result.stderr}")
+                    
+                print(f"{'='*60}\n")
+
+                # Check if script executed successfully
+                if result.returncode != 0:
+                    error_msg = f"Training script failed with exit code {result.returncode}"
+                    if result.stderr:
+                        error_msg += f"\n\nError output:\n{result.stderr}"
+                    if result.stdout:
+                        error_msg += f"\n\nStandard output:\n{result.stdout}"
+                    print(f"❌ {error_msg}")
+                    raise Exception(error_msg)
+
+                print(f"✅ Script executed successfully, now looking for MLflow run...")
+
+                # Get the latest run from the experiment
+                experiment = mlflow.get_experiment_by_name(experiment_name)
+                if not experiment:
+                    error_msg = f"Experiment '{experiment_name}' not found after training. The script must call mlflow.set_experiment() and mlflow.start_run()."
+                    print(f"❌ {error_msg}")
+                    raise Exception(error_msg)
+
+                print(f"✅ Experiment found: {experiment.name} (ID: {experiment.experiment_id})")
+
+                # Search for runs in this experiment
+                runs = mlflow.search_runs(
+                    experiment_ids=[experiment.experiment_id],
+                    order_by=["start_time DESC"],
+                    max_results=1,
+                )
+
+                if runs.empty:
+                    error_msg = (
+                        f"No MLflow runs found in experiment '{experiment_name}' after training.\n\n"
+                        f"Your script MUST:\n"
+                        f"1. Call mlflow.start_run() to start a run\n"
+                        f"2. Train your model\n"
+                        f"3. Call mlflow.sklearn.log_model(model, 'model') or similar to log the model\n"
+                        f"4. Call mlflow.end_run() or use context manager: with mlflow.start_run():\n\n"
+                        f"Example:\n"
+                        f"  import mlflow\n"
+                        f"  import mlflow.sklearn\n"
+                        f"  from sklearn.ensemble import RandomForestClassifier\n\n"
+                        f"  with mlflow.start_run():\n"
+                        f"      model = RandomForestClassifier()\n"
+                        f"      model.fit(X_train, y_train)\n"
+                        f"      mlflow.sklearn.log_model(model, 'model')\n"
+                        f"      mlflow.log_params({{'n_estimators': 100}})\n"
+                    )
+                    print(f"❌ {error_msg}")
+                    raise Exception(error_msg)
+
+                run_id = runs.iloc[0]["run_id"]
+                print(f"✅ Found MLflow run: {run_id}")
+
+                # Try to get or create model version in registry
+                try:
+                    client = mlflow.tracking.MlflowClient()
+                    
+                    # Check if model was logged with mlflow.log_model
+                    run = client.get_run(run_id)
+                    artifacts = client.list_artifacts(run_id)
+                    
+                    print(f"📦 Artifacts in run:")
+                    for artifact in artifacts:
+                        print(f"   - {artifact.path}")
+                    
+                    # Look for model artifact
+                    model_artifact = None
+                    for artifact in artifacts:
+                        if artifact.path == 'model' or artifact.path.endswith('/model'):
+                            model_artifact = artifact.path
+                            break
+                    
+                    if not model_artifact:
+                        error_msg = (
+                            f"No model artifact found in run {run_id}.\n\n"
+                            f"Your script MUST call one of these to log the model:\n"
+                            f"  - mlflow.sklearn.log_model(model, 'model')\n"
+                            f"  - mlflow.xgboost.log_model(model, 'model')\n"
+                            f"  - mlflow.pytorch.log_model(model, 'model')\n"
+                            f"  - mlflow.tensorflow.log_model(model, 'model')\n\n"
+                            f"Found artifacts: {[a.path for a in artifacts]}"
                         )
+                        print(f"❌ {error_msg}")
+                        raise Exception(error_msg)
+                    
+                    print(f"✅ Model artifact found: {model_artifact}")
+                    
+                    # Register the model in MLflow Model Registry
+                    model_uri = f"runs:/{run_id}/{model_artifact}"
+                    
+                    try:
+                        # Try to register new version to existing model
+                        model_version = client.create_model_version(
+                            name=model_name,
+                            source=model_uri,
+                            run_id=run_id,
+                            tags=tags
+                        )
+                        version = model_version.version
+                        print(f"✅ Model registered as new version: {model_name} v{version}")
+                    except Exception as reg_error:
+                        # If model doesn't exist, create it first
+                        if "RESOURCE_DOES_NOT_EXIST" in str(reg_error):
+                            print(f"📝 Creating new model: {model_name}")
+                            client.create_registered_model(model_name)
+                            model_version = client.create_model_version(
+                                name=model_name,
+                                source=model_uri,
+                                run_id=run_id,
+                                tags=tags
+                            )
+                            version = model_version.version
+                            print(f"✅ Model registered: {model_name} v{version}")
+                        else:
+                            raise reg_error
+                    
+                    return {
+                        "run_id": run_id,
+                        "version": version,
+                        "model_uri": model_uri
+                    }
+                    
+                except Exception as e:
+                    print(f"⚠️  Model registration error: {e}")
+                    print(f"⚠️  Continuing with run_id but version may be unknown")
+                    # Return basic info even if registration failed
+                    return {"run_id": run_id, "version": "1"}
 
-                        if not runs.empty:
-                            run_id = runs.iloc[0]["run_id"]
-
-                            # Try to get model version
-                            try:
-                                client = mlflow.tracking.MlflowClient()
-                                for mv in client.search_model_versions(f"name='{model_name}'"):
-                                    if mv.run_id == run_id:
-                                        return {"run_id": run_id, "version": mv.version}
-                            except:
-                                pass
-
-                            return {"run_id": run_id, "version": "1"}
-
-                return None
-
+        except subprocess.TimeoutExpired:
+            error_msg = f"Training script timed out after {timeout} seconds. Consider increasing the timeout parameter."
+            print(f"❌ {error_msg}")
+            raise Exception(error_msg)
         except Exception as e:
-            print(f"Training error: {e}")
-            return None
+            print(f"❌ Training error: {e}")
+            import traceback
+            traceback.print_exc()
+            # Re-raise the exception so the caller can handle it
+            raise
 
     def _build_docker_image(self, model_name, model_version, run_id, image_uri, aws_region):
         """Build Docker image for model inference."""
