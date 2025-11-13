@@ -340,40 +340,24 @@ class MLOpsService:
                 script_path = Path(tmpdir) / "train.py"
                 print(f"🔍 Script path: {script_path}")
 
-                # Inject MLflow configuration at the beginning
-                injected_script = f"""# Auto-injected MLflow configuration
+                # Inject minimal MLflow configuration
+                injected_script = """# Auto-injected MLflow configuration (minimal)
 import os
 import sys
 import mlflow
-from mlflow.tracking import MlflowClient
 
-# MLflow configuration
-os.environ['MLFLOW_TRACKING_URI'] = '{self.mlflow_tracking_uri}'
+# Disable MLflow system metrics and logged models (compatibility)
+os.environ['MLFLOW_TRACKING_URI'] = '""" + self.mlflow_tracking_uri + """'
 os.environ['GIT_PYTHON_REFRESH'] = 'quiet'
+os.environ['MLFLOW_ENABLE_SYSTEM_METRICS_LOGGING'] = 'false'
 
-mlflow.set_tracking_uri('{self.mlflow_tracking_uri}')
-mlflow.set_experiment('{experiment_name}')
+# Basic MLflow setup
+mlflow.set_tracking_uri('""" + self.mlflow_tracking_uri + """')
+mlflow.set_experiment('""" + experiment_name + """')
 
-# Monkey-patch to disable logged models feature (compatibility fix for MLflow < 2.14)
-try:
-    from mlflow.tracking.client import MlflowClient
-    from mlflow.tracking._tracking_service.client import TrackingServiceClient
-    
-    # Patch at the tracking service level to return None for logged model creation
-    original_create = TrackingServiceClient.create_logged_model
-    def patched_create_logged_model(self, *args, **kwargs):
-        # Skip the logged model creation entirely - not supported in MLflow < 2.14
-        return None
-    TrackingServiceClient.create_logged_model = patched_create_logged_model
-    
-    print("🔧 Applied MLflow compatibility patch (disabled logged_model for MLflow < 2.14)")
-except Exception as ex:
-    print(f"⚠️  Could not apply MLflow patch: {{ex}}")
-
-print(f"✅ MLflow configured:")
-print(f"   Tracking URI: {self.mlflow_tracking_uri}")
-print(f"   Experiment: {experiment_name}")
-print(f"   Model name: {model_name}")
+print("✅ MLflow configured (minimal mode):")
+print(f"   Tracking URI: """ + self.mlflow_tracking_uri + """")
+print(f"   Experiment: """ + experiment_name + """")
 
 """
                 # Add user-provided environment variables
@@ -411,11 +395,10 @@ print(f"   Model name: {model_name}")
                         raise Exception(error_msg)
                     print(f"✅ Requirements installed successfully")
 
-                # Prepare environment for script execution
+                # Prepare environment for script execution with minimal MLflow features
                 env = os.environ.copy()
                 env["MLFLOW_TRACKING_URI"] = self.mlflow_tracking_uri
                 env["MLFLOW_ENABLE_SYSTEM_METRICS_LOGGING"] = "false"
-                env["MLFLOW_LOGGED_MODELS_ENABLE"] = "false"
                 env["GIT_PYTHON_REFRESH"] = "quiet"
                 env["EXPERIMENT_NAME"] = experiment_name
                 env["MODEL_NAME"] = model_name
@@ -502,80 +485,43 @@ print(f"   Model name: {model_name}")
                 run_id = runs.iloc[0]["run_id"]
                 print(f"✅ Found MLflow run: {run_id}")
 
-                # Try to get or create model version in registry
+                # Simplified model registration - just verify model artifact exists
                 try:
                     client = mlflow.tracking.MlflowClient()
                     
-                    # Check if model was logged with mlflow.log_model
-                    run = client.get_run(run_id)
+                    # Check if model artifact exists
                     artifacts = client.list_artifacts(run_id)
                     
                     print(f"📦 Artifacts in run:")
+                    model_found = False
                     for artifact in artifacts:
                         print(f"   - {artifact.path}")
+                        if artifact.path == 'model' or 'model' in artifact.path:
+                            model_found = True
                     
-                    # Look for model artifact
-                    model_artifact = None
-                    for artifact in artifacts:
-                        if artifact.path == 'model' or artifact.path.endswith('/model'):
-                            model_artifact = artifact.path
-                            break
-                    
-                    if not model_artifact:
+                    if not model_found:
                         error_msg = (
                             f"No model artifact found in run {run_id}.\n\n"
-                            f"Your script MUST call one of these to log the model:\n"
-                            f"  - mlflow.sklearn.log_model(model, 'model')\n"
-                            f"  - mlflow.xgboost.log_model(model, 'model')\n"
-                            f"  - mlflow.pytorch.log_model(model, 'model')\n"
-                            f"  - mlflow.tensorflow.log_model(model, 'model')\n\n"
+                            f"Your script MUST call mlflow.<framework>.log_model(model, 'model')\n"
+                            f"Examples: mlflow.sklearn.log_model() or mlflow.xgboost.log_model()\n\n"
                             f"Found artifacts: {[a.path for a in artifacts]}"
                         )
                         print(f"❌ {error_msg}")
                         raise Exception(error_msg)
                     
-                    print(f"✅ Model artifact found: {model_artifact}")
+                    print(f"✅ Model artifact found in run")
                     
-                    # Register the model in MLflow Model Registry
-                    model_uri = f"runs:/{run_id}/{model_artifact}"
-                    
-                    try:
-                        # Try to register new version to existing model
-                        model_version = client.create_model_version(
-                            name=model_name,
-                            source=model_uri,
-                            run_id=run_id,
-                            tags=tags
-                        )
-                        version = model_version.version
-                        print(f"✅ Model registered as new version: {model_name} v{version}")
-                    except Exception as reg_error:
-                        # If model doesn't exist, create it first
-                        if "RESOURCE_DOES_NOT_EXIST" in str(reg_error):
-                            print(f"📝 Creating new model: {model_name}")
-                            client.create_registered_model(model_name)
-                            model_version = client.create_model_version(
-                                name=model_name,
-                                source=model_uri,
-                                run_id=run_id,
-                                tags=tags
-                            )
-                            version = model_version.version
-                            print(f"✅ Model registered: {model_name} v{version}")
-                        else:
-                            raise reg_error
-                    
+                    # Return basic info without complex registry operations
                     return {
                         "run_id": run_id,
-                        "version": version,
-                        "model_uri": model_uri
+                        "version": "latest",
+                        "model_uri": f"runs:/{run_id}/model"
                     }
                     
                 except Exception as e:
-                    print(f"⚠️  Model registration error: {e}")
-                    print(f"⚠️  Continuing with run_id but version may be unknown")
-                    # Return basic info even if registration failed
-                    return {"run_id": run_id, "version": "1"}
+                    print(f"⚠️  Model check error: {e}")
+                    # Return basic info if check fails
+                    return {"run_id": run_id, "version": "latest"}
 
         except subprocess.TimeoutExpired:
             error_msg = f"Training script timed out after {timeout} seconds. Consider increasing the timeout parameter."
