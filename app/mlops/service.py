@@ -354,15 +354,21 @@ os.environ['GIT_PYTHON_REFRESH'] = 'quiet'
 mlflow.set_tracking_uri('{self.mlflow_tracking_uri}')
 mlflow.set_experiment('{experiment_name}')
 
-# Monkey-patch to disable logged models feature (compatibility fix)
+# Monkey-patch to disable logged models feature (compatibility fix for MLflow < 2.14)
 try:
-    from mlflow.tracking import fluent
-    original_create_logged_model = fluent._create_logged_model
-    def _patched_create_logged_model(*args, **kwargs):
+    from mlflow.tracking.client import MlflowClient
+    from mlflow.tracking._tracking_service.client import TrackingServiceClient
+    
+    # Patch at the tracking service level to return None for logged model creation
+    original_create = TrackingServiceClient.create_logged_model
+    def patched_create_logged_model(self, *args, **kwargs):
+        # Skip the logged model creation entirely - not supported in MLflow < 2.14
         return None
-    fluent._create_logged_model = _patched_create_logged_model
-except:
-    pass
+    TrackingServiceClient.create_logged_model = patched_create_logged_model
+    
+    print("🔧 Applied MLflow compatibility patch (disabled logged_model for MLflow < 2.14)")
+except Exception as e:
+    print(f"⚠️  Could not apply MLflow patch: {e}")
 
 print(f"✅ MLflow configured:")
 print(f"   Tracking URI: {self.mlflow_tracking_uri}")
