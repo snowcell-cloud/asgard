@@ -340,24 +340,25 @@ class MLOpsService:
                 script_path = Path(tmpdir) / "train.py"
                 print(f"🔍 Script path: {script_path}")
 
-                # Inject minimal MLflow configuration
-                injected_script = """# Auto-injected MLflow configuration (minimal)
+                # Inject simple configuration without MLflow model logging
+                injected_script = """# Auto-injected configuration (no MLflow model logging)
 import os
 import sys
-import mlflow
+import pickle
+from pathlib import Path
 
-# Disable MLflow system metrics and logged models (compatibility)
-os.environ['MLFLOW_TRACKING_URI'] = '""" + self.mlflow_tracking_uri + """'
+# Setup environment
 os.environ['GIT_PYTHON_REFRESH'] = 'quiet'
-os.environ['MLFLOW_ENABLE_SYSTEM_METRICS_LOGGING'] = 'false'
 
-# Basic MLflow setup
-mlflow.set_tracking_uri('""" + self.mlflow_tracking_uri + """')
-mlflow.set_experiment('""" + experiment_name + """')
+# Create model directory for saving in current working directory
+MODEL_DIR = Path.cwd() / 'model_artifacts'
+MODEL_DIR.mkdir(exist_ok=True)
+MODEL_PATH = MODEL_DIR / 'model.pkl'
 
-print("✅ MLflow configured (minimal mode):")
-print(f"   Tracking URI: """ + self.mlflow_tracking_uri + """")
-print(f"   Experiment: """ + experiment_name + """")
+print("✅ Configuration (No MLflow logging):")
+print(f"   Working directory: {Path.cwd()}")
+print(f"   Model save path: {MODEL_PATH}")
+print(f"   To save your model: pickle.dump(model, open(MODEL_PATH, 'wb'))")
 
 """
                 # Add user-provided environment variables
@@ -443,85 +444,39 @@ print(f"   Experiment: """ + experiment_name + """")
                     print(f"❌ {error_msg}")
                     raise Exception(error_msg)
 
-                print(f"✅ Script executed successfully, now looking for MLflow run...")
+                print(f"✅ Script executed successfully")
 
-                # Get the latest run from the experiment
-                experiment = mlflow.get_experiment_by_name(experiment_name)
-                if not experiment:
-                    error_msg = f"Experiment '{experiment_name}' not found after training. The script must call mlflow.set_experiment() and mlflow.start_run()."
-                    print(f"❌ {error_msg}")
-                    raise Exception(error_msg)
-
-                print(f"✅ Experiment found: {experiment.name} (ID: {experiment.experiment_id})")
-
-                # Search for runs in this experiment
-                runs = mlflow.search_runs(
-                    experiment_ids=[experiment.experiment_id],
-                    order_by=["start_time DESC"],
-                    max_results=1,
-                )
-
-                if runs.empty:
+                # Check if model was saved
+                model_path = Path(tmpdir) / "model_artifacts" / "model.pkl"
+                if not model_path.exists():
                     error_msg = (
-                        f"No MLflow runs found in experiment '{experiment_name}' after training.\n\n"
-                        f"Your script MUST:\n"
-                        f"1. Call mlflow.start_run() to start a run\n"
-                        f"2. Train your model\n"
-                        f"3. Call mlflow.sklearn.log_model(model, 'model') or similar to log the model\n"
-                        f"4. Call mlflow.end_run() or use context manager: with mlflow.start_run():\n\n"
-                        f"Example:\n"
-                        f"  import mlflow\n"
-                        f"  import mlflow.sklearn\n"
-                        f"  from sklearn.ensemble import RandomForestClassifier\n\n"
-                        f"  with mlflow.start_run():\n"
-                        f"      model = RandomForestClassifier()\n"
-                        f"      model.fit(X_train, y_train)\n"
-                        f"      mlflow.sklearn.log_model(model, 'model')\n"
-                        f"      mlflow.log_params({{'n_estimators': 100}})\n"
+                        f"No model file found at {model_path}.\n\n"
+                        f"Your script MUST save the trained model:\n"
+                        f"  import pickle\n"
+                        f"  pickle.dump(model, open(MODEL_PATH, 'wb'))\n\n"
+                        f"The MODEL_PATH variable is pre-configured in your script."
                     )
                     print(f"❌ {error_msg}")
                     raise Exception(error_msg)
 
-                run_id = runs.iloc[0]["run_id"]
-                print(f"✅ Found MLflow run: {run_id}")
+                print(f"✅ Model file found: {model_path}")
 
-                # Simplified model registration - just verify model artifact exists
-                try:
-                    client = mlflow.tracking.MlflowClient()
-                    
-                    # Check if model artifact exists
-                    artifacts = client.list_artifacts(run_id)
-                    
-                    print(f"📦 Artifacts in run:")
-                    model_found = False
-                    for artifact in artifacts:
-                        print(f"   - {artifact.path}")
-                        if artifact.path == 'model' or 'model' in artifact.path:
-                            model_found = True
-                    
-                    if not model_found:
-                        error_msg = (
-                            f"No model artifact found in run {run_id}.\n\n"
-                            f"Your script MUST call mlflow.<framework>.log_model(model, 'model')\n"
-                            f"Examples: mlflow.sklearn.log_model() or mlflow.xgboost.log_model()\n\n"
-                            f"Found artifacts: {[a.path for a in artifacts]}"
-                        )
-                        print(f"❌ {error_msg}")
-                        raise Exception(error_msg)
-                    
-                    print(f"✅ Model artifact found in run")
-                    
-                    # Return basic info without complex registry operations
-                    return {
-                        "run_id": run_id,
-                        "version": "latest",
-                        "model_uri": f"runs:/{run_id}/model"
-                    }
-                    
-                except Exception as e:
-                    print(f"⚠️  Model check error: {e}")
-                    # Return basic info if check fails
-                    return {"run_id": run_id, "version": "latest"}
+                # Copy model to a persistent location for Docker build
+                persistent_model_path = Path(tmpdir) / "saved_model.pkl"
+                import shutil
+                shutil.copy(model_path, persistent_model_path)
+                
+                # Generate a simple run_id
+                import uuid
+                run_id = str(uuid.uuid4())
+                
+                print(f"✅ Model saved with ID: {run_id}")
+
+                return {
+                    "run_id": run_id,
+                    "version": "latest",
+                    "model_path": str(persistent_model_path)
+                }
 
         except subprocess.TimeoutExpired:
             error_msg = f"Training script timed out after {timeout} seconds. Consider increasing the timeout parameter."
