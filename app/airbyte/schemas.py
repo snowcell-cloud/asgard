@@ -71,7 +71,8 @@ class PostgresConfig(BaseModel):
     password: SecretStr = Field(..., json_schema_extra={"example": "password"})
 
     ssl_mode: Dict[str, Any] = Field(
-        default={"mode": "require"}, json_schema_extra={"example": {"mode": "disable,require,verify-ca,verify-full"}}
+        default={"mode": "require"},
+        json_schema_extra={"example": {"mode": "disable,require,verify-ca,verify-full"}},
     )
     replication_method: Dict[str, Any] = Field(
         default={"method": "Standard"}, json_schema_extra={"example": {"method": "Standard,CDC"}}
@@ -133,7 +134,9 @@ class S3Config(BaseModel):
     s3_bucket_name: str = Field(..., json_schema_extra={"example": "my-bucket"})
     s3_bucket_region: str = Field(..., json_schema_extra={"example": "us-east-1"})
     access_key_id: str = Field(..., json_schema_extra={"example": "AKIAIOSFODNN7EXAMPLE"})
-    secret_access_key: SecretStr = Field(..., json_schema_extra={"example": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"})
+    secret_access_key: SecretStr = Field(
+        ..., json_schema_extra={"example": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"}
+    )
     s3_bucket_path: str = Field("", json_schema_extra={"example": "exports/"})
     format: Dict[str, Any] = Field(
         default={"format_type": "Parquet", "flattening": "No flattening"},
@@ -174,7 +177,9 @@ class DataSinkPayload(BaseModel):
     """Payload describing a data sink. Only S3 sinks are supported."""
 
     name: str = Field(..., json_schema_extra={"example": "my_sink"})
-    type: DataDestinationType = Field(default=DataDestinationType.S3, json_schema_extra={"example": "s3"})
+    type: DataDestinationType = Field(
+        default=DataDestinationType.S3, json_schema_extra={"example": "s3"}
+    )
     config: S3Config
 
     @field_validator("type")
@@ -198,23 +203,35 @@ class ScheduleConfig(BaseModel):
         ..., example="cron", description="Type of schedule (cron, basic, manual)"
     )
     cronExpression: Optional[str] = Field(
-        None, json_schema_extra={"example": "0 0 12 * * ?"}, description="Cron expression for scheduling"
+        None,
+        json_schema_extra={"example": "0 0 12 * * ?"},
+        description="Cron expression for scheduling",
     )
 
 
 class IngestionPayload(BaseModel):
     """Payload for creating a connection between an existing source and destination."""
 
-    name: str = Field(..., json_schema_extra={"example": "Postgres-to-Bigquery"}, description="Name for the connection")
+    name: str = Field(
+        ...,
+        json_schema_extra={"example": "Postgres-to-Bigquery"},
+        description="Name for the connection",
+    )
     sourceId: str = Field(
-        ..., json_schema_extra={"example": "95e66a59-8045-4307-9678-63bc3c9b8c93"}, description="ID of the source"
+        ...,
+        json_schema_extra={"example": "95e66a59-8045-4307-9678-63bc3c9b8c93"},
+        description="ID of the source",
     )
     destinationId: str = Field(
-        ..., json_schema_extra={"example": "e478de0d-a3a0-475c-b019-25f7dd29e281"}, description="ID of the destination"
+        ...,
+        json_schema_extra={"example": "e478de0d-a3a0-475c-b019-25f7dd29e281"},
+        description="ID of the destination",
     )
     schedule: Optional[ScheduleConfig] = Field(None, description="Optional schedule configuration")
     status: Optional[str] = Field(
-        "active", json_schema_extra={"example": "active"}, description="Connection status (active, inactive)"
+        "active",
+        json_schema_extra={"example": "active"},
+        description="Connection status (active, inactive)",
     )
 
 
