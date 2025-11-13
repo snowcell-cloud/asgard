@@ -189,16 +189,22 @@ class DeployModelRequest(BaseModel):
 class DeployModelResponse(BaseModel):
     """Response from complete model deployment."""
 
-    job_id: str = Field(..., description="Deployment job identifier")
-    model_name: str
-    experiment_name: str
-    status: str = Field(..., description="Deployment status")
-    deployment_url: Optional[str] = Field(None, description="Model inference URL")
-    external_ip: Optional[str] = Field(None, description="LoadBalancer external IP")
-    model_version: Optional[str] = Field(None, description="Deployed model version")
-    run_id: Optional[str] = Field(None, description="MLflow run ID")
-    ecr_image: Optional[str] = Field(None, description="ECR image URI")
-    error: Optional[str] = Field(None, description="Error message if failed")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    completed_at: Optional[datetime] = None
-    duration_seconds: Optional[float] = None
+    model_name: str = Field(..., description="Deployed model name")
+    experiment_name: str = Field(..., description="MLflow experiment name")
+    status: str = Field(..., description="Deployment status: deployed or failed")
+    inference_url: str = Field(..., description="Model inference URL - use this for predictions!")
+    external_ip: str = Field(..., description="LoadBalancer external IP")
+    model_version: str = Field(..., description="Deployed model version")
+    run_id: str = Field(..., description="MLflow run ID")
+    ecr_image: str = Field(..., description="ECR image URI")
+    endpoints: Dict[str, str] = Field(
+        ...,
+        description="Available endpoints on the deployed model",
+        example={
+            "health": "http://IP/health",
+            "metadata": "http://IP/metadata",
+            "predict": "http://IP/predict",
+        },
+    )
+    deployment_time_seconds: float = Field(..., description="Total deployment time")
+    message: str = Field(..., description="Success message")

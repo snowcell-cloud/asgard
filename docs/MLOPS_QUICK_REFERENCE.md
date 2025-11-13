@@ -1,19 +1,15 @@
 # 🎯 MLOps API Quick Reference
 
-## ✅ Available Endpoints
+## ✅ Available Endpoints (Final - 4 Endpoints)
 
 ### Management APIs (http://localhost:8000/mlops)
 
-| Endpoint                  | Method | Purpose                                | Returns                       |
-| ------------------------- | ------ | -------------------------------------- | ----------------------------- |
-| `/training/upload`        | POST   | Upload training script                 | `job_id`                      |
-| `/training/jobs/{job_id}` | GET    | Training status                        | Status, logs, model version   |
-| `/deploy`                 | POST   | Deploy model (train→build→push→deploy) | `job_id`                      |
-| `/deployments/{job_id}`   | GET    | Deployment status                      | Status, **deployment_url** ⭐ |
-| `/models`                 | GET    | List all models                        | Model list                    |
-| `/models/{name}`          | GET    | Get model details                      | Model info                    |
-| `/registry`               | POST   | Register model manually                | Model version                 |
-| `/status`                 | GET    | Platform health                        | MLflow, Feast status          |
+| Endpoint         | Method | Purpose                                | Returns                     |
+| ---------------- | ------ | -------------------------------------- | --------------------------- |
+| `/deploy`        | POST   | Deploy model (train→build→push→deploy) | Inference URL (synchronous) |
+| `/models`        | GET    | List all models                        | Model list                  |
+| `/models/{name}` | GET    | Get model details                      | Model info                  |
+| `/status`        | GET    | Platform health                        | MLflow, Feast status        |
 
 ### Inference APIs (on deployed model URL)
 
@@ -26,43 +22,49 @@
 
 ---
 
-## ❌ Removed Endpoints
+## ❌ Removed Endpoints (Streamlined API)
 
-| Endpoint           | Status     | Use Instead                    |
-| ------------------ | ---------- | ------------------------------ |
-| `/mlops/inference` | ❌ REMOVED | Use `{deployment_url}/predict` |
+| Endpoint                  | Status     | Use Instead                    |
+| ------------------------- | ---------- | ------------------------------ |
+| `/mlops/inference`        | ❌ REMOVED | Use `{inference_url}/predict`  |
+| `/training/upload`        | ❌ REMOVED | Use `/deploy`                  |
+| `/training/jobs/{job_id}` | ❌ REMOVED | `/deploy` is synchronous now   |
+| `/registry`               | ❌ REMOVED | Auto-registered in `/deploy`   |
+| `/deployments/{job_id}`   | ❌ REMOVED | `/deploy` returns URL directly |
 
 ---
 
-## 🚀 Common Workflows
-
-### Deploy and Use a Model
+## 🚀 Single Workflow: Deploy and Use
 
 ```bash
-# 1. Deploy
+# Deploy (returns inference URL in 3-5 minutes - synchronous)
 curl -X POST http://localhost:8000/mlops/deploy \
   -H "Content-Type: application/json" \
   -d '{
     "script_name": "train.py",
-    "script_content": "...",
+    "script_content": "<base64-encoded-script>",
     "experiment_name": "production",
     "model_name": "my_model",
-    "requirements": ["scikit-learn"],
+    "requirements": ["scikit-learn==1.3.0"]
     "replicas": 2
   }'
 
-# Returns: {"job_id": "abc123", "status": "training"}
+# Response (synchronous - returns in 3-5 minutes):
+{
+  "deployment_id": "my_model-v1-abc123",
+  "model_name": "my_model",
+  "model_version": "1",
+  "status": "deployed",
+  "inference_url": "http://51.89.136.142/predict",
+  "endpoints": {
+    "predict": "http://51.89.136.142/predict",
+    "health": "http://51.89.136.142/health",
+    "metadata": "http://51.89.136.142/metadata"
+  },
+  "deployment_time_seconds": 245.8
+}
 
-# 2. Check status (poll until "deployed")
-curl http://localhost:8000/mlops/deployments/abc123
-
-# Returns: {
-#   "status": "deployed",
-#   "deployment_url": "http://51.89.136.142",  ← USE THIS!
-#   "model_version": "1"
-# }
-
-# 3. Make predictions
+# Use the model immediately
 curl -X POST http://51.89.136.142/predict \
   -H "Content-Type: application/json" \
   -d '{
@@ -77,71 +79,126 @@ curl -X POST http://51.89.136.142/predict \
 
 ---
 
-## 📋 Deployment Statuses
+## 🎯 Key Changes
 
-| Status      | Description                | Action             |
-| ----------- | -------------------------- | ------------------ |
-| `training`  | Model training in progress | Wait               |
-| `building`  | Building Docker image      | Wait               |
-| `pushing`   | Pushing to ECR             | Wait               |
-| `deploying` | Deploying to K8s           | Wait               |
-| `deployed`  | ✅ Ready for inference     | Use deployment_url |
-| `failed`    | ❌ Error occurred          | Check error field  |
+### Before (8 Endpoints - Complex)
+
+- ❌ Upload training script → Poll for completion
+- ❌ Register model manually
+- ❌ Deploy model → Poll for completion
+- ❌ Use `/mlops/inference` proxy
+
+### After (4 Endpoints - Simple)
+
+- ✅ One `/deploy` call → Returns inference URL
+- ✅ Automatic registration
+- ✅ Synchronous (no polling)
+- ✅ Direct inference URLs
 
 ---
 
 ## 🎯 Key Points
 
-1. **Management** = `http://localhost:8000/mlops/*`
-2. **Inference** = `http://{deployment_url}/predict`
-3. **No more** `/mlops/inference` endpoint
-4. Each model gets its own URL
-5. Models scale independently
+1. **Management** = `http://localhost:8000/mlops/*` (4 endpoints)
+2. **Inference** = `http://{inference_url}/predict` (on deployed URLs)
+3. **No polling** - Synchronous deployment
+4. **No proxy** - Direct model URLs
+5. **One API call** - Complete deployment
 
 ---
 
 ## 💡 Tips
+
+### Python Client Example
+
+```python
+import requests
+import base64
+
+# Read and encode script
+with open("train.py") as f:
+    script = f.read()
+script_b64 = base64.b64encode(script.encode()).decode()
+
+# Deploy (synchronous)
+response = requests.post(
+    "http://localhost:8000/mlops/deploy",
+    json={
+        "script_content": script_b64,
+        "script_name": "train.py",
+        "experiment_name": "fraud-detection",
+        "model_name": "fraud-model",
+        "requirements": ["scikit-learn==1.3.0"]
+    }
+)
+
+deployment = response.json()
+inference_url = deployment["inference_url"]
+
+# Use immediately
+result = requests.post(
+    inference_url,
+    json={"data": [[0.1, 0.2, 0.3, 0.4, 0.5]]}
+)
+print(result.json())
+```
 
 ### Save Deployment URLs
 
 ```python
 # In your config/database
 MODEL_URLS = {
-    "churn_model": "http://51.89.136.142",
-    "fraud_model": "http://51.89.136.143",
+    "churn_model": "http://51.89.136.142/predict",
+    "fraud_model": "http://51.89.136.143/predict",
 }
 
 # Use them
-requests.post(f"{MODEL_URLS['churn_model']}/predict", ...)
+requests.post(MODEL_URLS['churn_model'], ...)
 ```
 
 ### Health Monitoring
 
 ```bash
 # Check if model is healthy
-curl http://IP/health
+curl http://51.89.136.142/health
 
 # Get model metadata
-curl http://IP/metadata
+curl http://51.89.136.142/metadata
 ```
 
-### List Deployed Models
+### List Models
 
 ```bash
-# Via Kubernetes
-kubectl get svc -n asgard -l app.kubernetes.io/component=inference
-
-# Via MLOps (registry only)
+# List all registered models
 curl http://localhost:8000/mlops/models
+
+# Get specific model details
+curl http://localhost:8000/mlops/models/fraud-model
+
+# Check platform health
+curl http://localhost:8000/mlops/status
 ```
 
 ---
 
 ## 📖 Full Documentation
 
-- **docs/MLOPS_API_CLEANUP.md** - Complete migration guide
-- **ONE_CLICK_DEPLOYMENT.md** - Deployment details
-- **API_TESTING_GUIDE.md** - Testing examples
+- **docs/MLOPS_API_FINAL.md** - Complete API reference
+- **docs/SINGLE_CLICK_DEPLOYMENT.md** - Deployment guide
+- **docs/MLOPS_API_CLEANUP.md** - Migration details
+- **docs/API_TESTING_GUIDE.md** - Testing examples
+
+---
+
+## 📊 Improvements
+
+| Metric                   | Before | After | Change |
+| ------------------------ | ------ | ----- | ------ |
+| Endpoints                | 8      | 4     | -50%   |
+| API calls for deployment | 3-5    | 1     | -80%   |
+| Polling required         | Yes    | No    | ✅     |
+| Response time            | Async  | Sync  | ✅     |
+| Code lines               | 990    | 640   | -35%   |
 
 ---
 

@@ -64,20 +64,20 @@ class DataDestinationType(str, Enum):
 
 
 class PostgresConfig(BaseModel):
-    host: str = Field(..., example="localhost")
-    port: int = Field(5432, example=5432)
-    database: str = Field(..., example="postgres")
-    username: str = Field(..., example="postgres")
-    password: SecretStr = Field(..., example="password")
+    host: str = Field(..., json_schema_extra={"example": "localhost"})
+    port: int = Field(5432, json_schema_extra={"example": 5432})
+    database: str = Field(..., json_schema_extra={"example": "postgres"})
+    username: str = Field(..., json_schema_extra={"example": "postgres"})
+    password: SecretStr = Field(..., json_schema_extra={"example": "password"})
 
     ssl_mode: Dict[str, Any] = Field(
-        default={"mode": "require"}, example={"mode": "disable,require,verify-ca,verify-full"}
+        default={"mode": "require"}, json_schema_extra={"example": {"mode": "disable,require,verify-ca,verify-full"}}
     )
     replication_method: Dict[str, Any] = Field(
-        default={"method": "Standard"}, example={"method": "Standard,CDC"}
+        default={"method": "Standard"}, json_schema_extra={"example": {"method": "Standard,CDC"}}
     )
-    # tunnel_method: Union[str, TunnelMethod] = Field("NO_TUNNEL", example="NO_TUNNEL,SSH")
-    source_type: str = Field("postgres", example="postgres")
+    # tunnel_method: Union[str, TunnelMethod] = Field("NO_TUNNEL", json_schema_extra={"example": "NO_TUNNEL,SSH"})
+    source_type: str = Field("postgres", json_schema_extra={"example": "postgres"})
 
     @validator("port")
     def port_must_be_valid(cls, v: int) -> int:
@@ -96,12 +96,12 @@ class PostgresConfig(BaseModel):
 class MySQLConfig(BaseModel):
     """Configuration for a MySQL connector."""
 
-    host: str = Field(..., example="localhost")
-    port: int = Field(3306, example=3306)
-    database: str = Field(..., example="mysql_db")
-    username: str = Field(..., example="root")
-    password: SecretStr = Field(..., example="password")
-    # charset: str = Field("utf8mb4", example="utf8mb4")
+    host: str = Field(..., json_schema_extra={"example": "localhost"})
+    port: int = Field(3306, json_schema_extra={"example": 3306})
+    database: str = Field(..., json_schema_extra={"example": "mysql_db"})
+    username: str = Field(..., json_schema_extra={"example": "root"})
+    password: SecretStr = Field(..., json_schema_extra={"example": "password"})
+    # charset: str = Field("utf8mb4", json_schema_extra={"example": "utf8mb4"})
 
     @validator("port")
     def port_must_be_valid(cls, v: int) -> int:
@@ -113,39 +113,39 @@ class MySQLConfig(BaseModel):
 class KafkaConfig(BaseModel):
     """Configuration for a Kafka connector."""
 
-    bootstrap_servers: List[str] = Field(..., example=["localhost:9092"])
-    security_protocol: str = Field("PLAINTEXT", example="PLAINTEXT")
-    topic: str = Field(..., example="my_topic")
-    group_id: Optional[str] = Field("default_group", example="my_group")
+    bootstrap_servers: List[str] = Field(..., json_schema_extra={"example": ["localhost:9092"]})
+    security_protocol: str = Field("PLAINTEXT", json_schema_extra={"example": "PLAINTEXT"})
+    topic: str = Field(..., json_schema_extra={"example": "my_topic"})
+    group_id: Optional[str] = Field("default_group", json_schema_extra={"example": "my_group"})
 
 
 class MongoDBConfig(BaseModel):
     """Configuration for a MongoDB connector."""
 
-    connection_string: str = Field(..., example="mongodb://localhost:27017/")
-    database: str = Field(..., example="mydb")
-    auth_source: str = Field("admin", example="admin")
+    connection_string: str = Field(..., json_schema_extra={"example": "mongodb://localhost:27017/"})
+    database: str = Field(..., json_schema_extra={"example": "mydb"})
+    auth_source: str = Field("admin", json_schema_extra={"example": "admin"})
 
 
 class S3Config(BaseModel):
     """Configuration for an S3 destination connector."""
 
-    s3_bucket_name: str = Field(..., example="my-bucket")
-    s3_bucket_region: str = Field(..., example="us-east-1")
-    access_key_id: str = Field(..., example="AKIAIOSFODNN7EXAMPLE")
-    secret_access_key: SecretStr = Field(..., example="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
-    s3_bucket_path: str = Field("", example="exports/")
+    s3_bucket_name: str = Field(..., json_schema_extra={"example": "my-bucket"})
+    s3_bucket_region: str = Field(..., json_schema_extra={"example": "us-east-1"})
+    access_key_id: str = Field(..., json_schema_extra={"example": "AKIAIOSFODNN7EXAMPLE"})
+    secret_access_key: SecretStr = Field(..., json_schema_extra={"example": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"})
+    s3_bucket_path: str = Field("", json_schema_extra={"example": "exports/"})
     format: Dict[str, Any] = Field(
         default={"format_type": "Parquet", "flattening": "No flattening"},
-        example={"format_type": "Parquet", "flattening": "No flattening"},
+        json_schema_extra={"example": {"format_type": "Parquet", "flattening": "No flattening"}},
     )
-    destinationType: str = Field("s3", example="s3")
+    destinationType: str = Field("s3", json_schema_extra={"example": "s3"})
 
 
 class DataSourcePayload(BaseModel):
     """Payload describing a data source using typed configs."""
 
-    name: str = Field(..., example="my_source")
+    name: str = Field(..., json_schema_extra={"example": "my_source"})
     type: DataSourceType
     config: Union[
         PostgresConfig,
@@ -153,14 +153,14 @@ class DataSourcePayload(BaseModel):
         KafkaConfig,
         MongoDBConfig,
     ]
-    workspace: Optional[str] = Field(None, example="Default Workspace")
+    workspace: Optional[str] = Field(None, json_schema_extra={"example": "Default Workspace"})
 
 
 class DataSourceResponse(BaseModel):
     """Data source response returned from the API."""
 
-    id: str = Field(..., example="12345678-1234-1234-1234-123456789012")
-    name: str = Field(..., example="my_source")
+    id: str = Field(..., json_schema_extra={"example": "12345678-1234-1234-1234-123456789012"})
+    name: str = Field(..., json_schema_extra={"example": "my_source"})
     type: DataSourceType
     config: Union[
         PostgresConfig,
@@ -173,8 +173,8 @@ class DataSourceResponse(BaseModel):
 class DataSinkPayload(BaseModel):
     """Payload describing a data sink. Only S3 sinks are supported."""
 
-    name: str = Field(..., example="my_sink")
-    type: DataDestinationType = Field(default=DataDestinationType.S3, example="s3")
+    name: str = Field(..., json_schema_extra={"example": "my_sink"})
+    type: DataDestinationType = Field(default=DataDestinationType.S3, json_schema_extra={"example": "s3"})
     config: S3Config
 
     @field_validator("type")
@@ -198,23 +198,23 @@ class ScheduleConfig(BaseModel):
         ..., example="cron", description="Type of schedule (cron, basic, manual)"
     )
     cronExpression: Optional[str] = Field(
-        None, example="0 0 12 * * ?", description="Cron expression for scheduling"
+        None, json_schema_extra={"example": "0 0 12 * * ?"}, description="Cron expression for scheduling"
     )
 
 
 class IngestionPayload(BaseModel):
     """Payload for creating a connection between an existing source and destination."""
 
-    name: str = Field(..., example="Postgres-to-Bigquery", description="Name for the connection")
+    name: str = Field(..., json_schema_extra={"example": "Postgres-to-Bigquery"}, description="Name for the connection")
     sourceId: str = Field(
-        ..., example="95e66a59-8045-4307-9678-63bc3c9b8c93", description="ID of the source"
+        ..., json_schema_extra={"example": "95e66a59-8045-4307-9678-63bc3c9b8c93"}, description="ID of the source"
     )
     destinationId: str = Field(
-        ..., example="e478de0d-a3a0-475c-b019-25f7dd29e281", description="ID of the destination"
+        ..., json_schema_extra={"example": "e478de0d-a3a0-475c-b019-25f7dd29e281"}, description="ID of the destination"
     )
     schedule: Optional[ScheduleConfig] = Field(None, description="Optional schedule configuration")
     status: Optional[str] = Field(
-        "active", example="active", description="Connection status (active, inactive)"
+        "active", json_schema_extra={"example": "active"}, description="Connection status (active, inactive)"
     )
 
 

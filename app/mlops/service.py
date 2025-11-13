@@ -1,11 +1,10 @@
 """
 MLOps Service for ML lifecycle management.
 
-Management and orchestration for ML workflows:
-- Upload and execute Python training scripts
-- Register models to MLflow
-- One-click deployment to Kubernetes
-- Track training and deployment job status
+Simplified single-click deployment:
+- One-click deployment: train + build + push + deploy
+- Query models and versions from MLflow
+- Platform health status
 
 Note: Model inference is handled by deployed inference services, not here.
 """
@@ -16,7 +15,6 @@ import base64
 import subprocess
 import tempfile
 import time
-import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -31,11 +29,6 @@ from app.feast.service import FeatureStoreService
 from app.mlops.schemas import (
     ModelInfo,
     ModelVersionInfo,
-    RegisterModelRequest,
-    RegisterModelResponse,
-    TrainingJobStatus,
-    TrainingScriptUploadRequest,
-    TrainingScriptUploadResponse,
     MLOpsStatus,
 )
 from app.mlops.deployment_service import ModelDeploymentService
@@ -61,52 +54,13 @@ class MLOpsService:
         # Initialize deployment service for automated model deployment
         self.deployment_service = ModelDeploymentService()
 
-        # Training jobs storage (in-memory for now)
-        self.training_jobs: Dict[str, Dict[str, Any]] = {}
-        self.training_jobs_lock = threading.Lock()
-
-        # Deployment jobs storage (in-memory for now)
-        self.deployment_jobs: Dict[str, Dict[str, Any]] = {}
-        self.deployment_jobs_lock = threading.Lock()
-
         print(f"✅ MLOpsService initialized")
         print(f"   MLflow: {self.mlflow_tracking_uri}")
         print(f"   Feast repo: {self.feast_service.feast_repo_path}")
 
     # ========================================================================
-    # Model Registry (/registry)
+    # Model Registry - Read Only (/models)
     # ========================================================================
-
-    async def register_model(self, request: RegisterModelRequest) -> RegisterModelResponse:
-        """Register a model to MLflow Model Registry."""
-        try:
-            model_uri = f"runs:/{request.run_id}/model"
-
-            # Register model
-            model_version = mlflow.register_model(
-                model_uri=model_uri,
-                name=request.model_name,
-                tags=request.tags,
-            )
-
-            # Update version description
-            if request.description:
-                self.mlflow_client.update_model_version(
-                    name=request.model_name,
-                    version=model_version.version,
-                    description=request.description,
-                )
-
-            return RegisterModelResponse(
-                model_name=request.model_name,
-                version=str(model_version.version),
-                run_id=request.run_id,
-                status="registered",
-                created_at=datetime.utcnow(),
-            )
-
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Model registration failed: {str(e)}")
 
     async def get_model_info(self, model_name: str) -> ModelInfo:
         """Get information about a registered model."""
@@ -197,542 +151,125 @@ class MLOpsService:
             raise HTTPException(status_code=500, detail=f"Status check failed: {str(e)}")
 
     # ========================================================================
-    # Script-based Training (/training/upload)
-    # ========================================================================
-
-    async def upload_and_execute_script(
-        self, request: TrainingScriptUploadRequest
-    ) -> TrainingScriptUploadResponse:
-        """
-        Upload and execute a Python training script.
-
-        The script must:
-        1. Use mlflow.start_run() to log experiments
-        2. Call mlflow.log_model() to register the trained model
-        3. Optionally use provided environment variables
-        """
-        try:
-            # Generate job ID
-            job_id = str(uuid.uuid4())[:8]
-
-            # Decode script content (assuming base64 encoded)
-            try:
-                script_bytes = base64.b64decode(request.script_content)
-                script_text = script_bytes.decode("utf-8")
-            except Exception:
-                # If not base64, treat as plain text
-                script_text = request.script_content
-
-            # Store job info
-            job_info = {
-                "job_id": job_id,
-                "script_name": request.script_name,
-                "experiment_name": request.experiment_name,
-                "model_name": request.model_name,
-                "status": "queued",
-                "run_id": None,
-                "model_version": None,
-                "error": None,
-                "created_at": datetime.utcnow(),
-                "started_at": None,
-                "completed_at": None,
-                "logs": "",
-            }
-
-            with self.training_jobs_lock:
-                self.training_jobs[job_id] = job_info
-
-            # Execute script in background thread
-            thread = threading.Thread(
-                target=self._execute_training_script,
-                args=(
-                    job_id,
-                    script_text,
-                    request.experiment_name,
-                    request.model_name,
-                    request.requirements,
-                    request.environment_vars,
-                    request.timeout,
-                    request.tags,
-                ),
-            )
-            thread.daemon = True
-            thread.start()
-
-            return TrainingScriptUploadResponse(
-                job_id=job_id,
-                script_name=request.script_name,
-                experiment_name=request.experiment_name,
-                model_name=request.model_name,
-                status="queued",
-                created_at=datetime.utcnow(),
-            )
-
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to upload script: {str(e)}")
-
-    def _execute_training_script(
-        self,
-        job_id: str,
-        script_text: str,
-        experiment_name: str,
-        model_name: str,
-        requirements: List[str],
-        environment_vars: Dict[str, str],
-        timeout: int,
-        tags: Dict[str, str],
-    ):
-        """Execute training script in isolated environment."""
-        try:
-            # Update status to running
-            with self.training_jobs_lock:
-                self.training_jobs[job_id]["status"] = "running"
-                self.training_jobs[job_id]["started_at"] = datetime.utcnow()
-
-            # Create temporary directory for script execution
-            with tempfile.TemporaryDirectory() as tmpdir:
-                script_path = Path(tmpdir) / "train.py"
-
-                # Inject MLflow configuration into script
-                injected_script = f"""
-import os
-import sys
-import mlflow
-
-# MLflow configuration
-os.environ['MLFLOW_TRACKING_URI'] = '{self.mlflow_tracking_uri}'
-mlflow.set_tracking_uri('{self.mlflow_tracking_uri}')
-mlflow.set_experiment('{experiment_name}')
-
-# User-provided environment variables
-"""
-                for key, value in environment_vars.items():
-                    injected_script += f"os.environ['{key}'] = '{value}'\n"
-
-                injected_script += "\n# User script\n" + script_text
-
-                # Write script to file
-                script_path.write_text(injected_script)
-
-                # Install requirements if specified
-                logs = ""
-                if requirements:
-                    logs += "Installing requirements...\n"
-                    try:
-                        result = subprocess.run(
-                            [
-                                "pip",
-                                "install",
-                                "--quiet",
-                                "--no-cache-dir",
-                            ]
-                            + requirements,
-                            capture_output=True,
-                            text=True,
-                            timeout=120,
-                            cwd=tmpdir,
-                        )
-                        logs += result.stdout + result.stderr
-                    except subprocess.TimeoutExpired:
-                        logs += "Requirements installation timed out\n"
-
-                # Execute the script
-                logs += "\nExecuting training script...\n"
-                try:
-                    env = os.environ.copy()
-                    env["MLFLOW_TRACKING_URI"] = self.mlflow_tracking_uri
-                    env.update(environment_vars)
-
-                    result = subprocess.run(
-                        ["python", str(script_path)],
-                        capture_output=True,
-                        text=True,
-                        timeout=timeout,
-                        cwd=tmpdir,
-                        env=env,
-                    )
-
-                    logs += result.stdout
-                    if result.stderr:
-                        logs += "\nStderr:\n" + result.stderr
-
-                    # Check if execution was successful
-                    if result.returncode == 0:
-                        # Try to get the latest run from the experiment
-                        experiment = mlflow.get_experiment_by_name(experiment_name)
-                        if experiment:
-                            runs = mlflow.search_runs(
-                                experiment_ids=[experiment.experiment_id],
-                                order_by=["start_time DESC"],
-                                max_results=1,
-                            )
-
-                            if not runs.empty:
-                                run_id = runs.iloc[0]["run_id"]
-
-                                # Check if model is already registered in this run
-                                # (training script might have registered it)
-                                model_version = None
-                                try:
-                                    client = mlflow.tracking.MlflowClient()
-                                    registered_model = client.get_registered_model(model_name)
-
-                                    # Find version with matching run_id
-                                    for mv in client.search_model_versions(f"name='{model_name}'"):
-                                        if mv.run_id == run_id:
-                                            model_version = mv.version
-                                            logs += f"\n✅ Model already registered: {model_name} version {model_version}\n"
-                                            break
-
-                                    # If not found, register it
-                                    if not model_version:
-                                        model_uri = f"runs:/{run_id}/model"
-                                        result = mlflow.register_model(model_uri, model_name)
-                                        model_version = result.version
-                                        logs += f"\n✅ Model registered: {model_name} version {model_version}\n"
-
-                                except Exception as check_error:
-                                    # Model doesn't exist yet, try to register it
-                                    try:
-                                        model_uri = f"runs:/{run_id}/model"
-                                        result = mlflow.register_model(model_uri, model_name)
-                                        model_version = result.version
-                                        logs += f"\n✅ Model registered: {model_name} version {model_version}\n"
-                                    except Exception as reg_error:
-                                        logs += (
-                                            f"\n⚠️  Model registration failed: {str(reg_error)}\n"
-                                        )
-
-                                if model_version:
-                                    # Update job status
-                                    model_version = int(model_version)
-
-                                    with self.training_jobs_lock:
-                                        self.training_jobs[job_id]["run_id"] = run_id
-                                        self.training_jobs[job_id]["model_version"] = model_version
-                                        self.training_jobs[job_id]["status"] = "completed"
-                                        self.training_jobs[job_id]["logs"] = logs
-                                        self.training_jobs[job_id][
-                                            "completed_at"
-                                        ] = datetime.utcnow()
-
-                                    # 🚀 AUTOMATED DEPLOYMENT: Build image and deploy to EKS
-                                    logs += "\n" + "=" * 80 + "\n"
-                                    logs += "🚀 Starting automated deployment to OVH EKS...\n"
-                                    logs += "=" * 80 + "\n"
-
-                                    try:
-                                        deployment_result = (
-                                            self.deployment_service.deploy_model_after_training(
-                                                model_name=model_name,
-                                                model_version=str(model_version),
-                                                run_id=run_id,
-                                                tags=tags,
-                                            )
-                                        )
-
-                                        if deployment_result.get("status") == "deployed":
-                                            logs += f"\n✅ Deployment successful!\n"
-                                            logs += f"   Deployment ID: {deployment_result['deployment_id']}\n"
-                                            logs += f"   Image: {deployment_result['image_uri']}\n"
-                                            logs += (
-                                                f"   Namespace: {deployment_result['namespace']}\n"
-                                            )
-                                            logs += f"   Endpoint: {deployment_result['deployment_info']['endpoint']}\n"
-
-                                            with self.training_jobs_lock:
-                                                self.training_jobs[job_id][
-                                                    "deployment_info"
-                                                ] = deployment_result
-                                                self.training_jobs[job_id]["logs"] = logs
-                                        else:
-                                            logs += f"\n⚠️  Deployment failed: {deployment_result.get('error', 'Unknown error')}\n"
-                                            with self.training_jobs_lock:
-                                                self.training_jobs[job_id]["deployment_error"] = (
-                                                    deployment_result.get("error")
-                                                )
-                                                self.training_jobs[job_id]["logs"] = logs
-
-                                    except Exception as deploy_error:
-                                        logs += f"\n❌ Deployment exception: {str(deploy_error)}\n"
-                                        with self.training_jobs_lock:
-                                            self.training_jobs[job_id]["deployment_error"] = str(
-                                                deploy_error
-                                            )
-                                            self.training_jobs[job_id]["logs"] = logs
-                                else:
-                                    # Model version not found, mark as completed without deployment
-                                    logs += "\n⚠️  Model version not found, skipping deployment\n"
-                                    with self.training_jobs_lock:
-                                        self.training_jobs[job_id]["run_id"] = run_id
-                                        self.training_jobs[job_id]["status"] = "completed"
-                                        self.training_jobs[job_id]["logs"] = logs
-                                        self.training_jobs[job_id][
-                                            "completed_at"
-                                        ] = datetime.utcnow()
-                            else:
-                                logs += "\nNo runs found in experiment\n"
-                                with self.training_jobs_lock:
-                                    self.training_jobs[job_id]["status"] = "failed"
-                                    self.training_jobs[job_id]["error"] = "No MLflow run created"
-                                    self.training_jobs[job_id]["logs"] = logs
-                                    self.training_jobs[job_id]["completed_at"] = datetime.utcnow()
-                    else:
-                        with self.training_jobs_lock:
-                            self.training_jobs[job_id]["status"] = "failed"
-                            self.training_jobs[job_id][
-                                "error"
-                            ] = f"Script exited with code {result.returncode}"
-                            self.training_jobs[job_id]["logs"] = logs
-                            self.training_jobs[job_id]["completed_at"] = datetime.utcnow()
-
-                except subprocess.TimeoutExpired:
-                    logs += f"\nScript execution timed out after {timeout} seconds\n"
-                    with self.training_jobs_lock:
-                        self.training_jobs[job_id]["status"] = "failed"
-                        self.training_jobs[job_id]["error"] = "Execution timeout"
-                        self.training_jobs[job_id]["logs"] = logs
-                        self.training_jobs[job_id]["completed_at"] = datetime.utcnow()
-
-        except Exception as e:
-            with self.training_jobs_lock:
-                self.training_jobs[job_id]["status"] = "failed"
-                self.training_jobs[job_id]["error"] = str(e)
-                self.training_jobs[job_id]["completed_at"] = datetime.utcnow()
-
-    async def get_training_job_status(self, job_id: str) -> TrainingJobStatus:
-        """Get status of a training job."""
-        with self.training_jobs_lock:
-            if job_id not in self.training_jobs:
-                raise HTTPException(status_code=404, detail=f"Training job {job_id} not found")
-
-            job = self.training_jobs[job_id]
-
-            # Calculate duration if completed
-            duration_seconds = None
-            if job["completed_at"] and job["started_at"]:
-                duration_seconds = (job["completed_at"] - job["started_at"]).total_seconds()
-
-            return TrainingJobStatus(
-                job_id=job["job_id"],
-                script_name=job["script_name"],
-                experiment_name=job["experiment_name"],
-                model_name=job["model_name"],
-                status=job["status"],
-                run_id=job["run_id"],
-                model_version=job["model_version"],
-                logs=job.get("logs"),
-                error=job["error"],
-                created_at=job["created_at"],
-                started_at=job["started_at"],
-                completed_at=job["completed_at"],
-                duration_seconds=duration_seconds,
-            )
-
-    # ========================================================================
     # End-to-End Deployment (/deploy)
     # ========================================================================
 
     async def deploy_model_end_to_end(self, request) -> dict:
         """
-        Complete model deployment pipeline:
+        Complete model deployment pipeline - SYNCHRONOUS:
         1. Train model via uploaded script
         2. Build Docker image
         3. Push to ECR
         4. Deploy to K8s with LoadBalancer
+        5. Wait for external IP
+        6. Return inference URL
 
-        Returns deployment URL and status.
+        This is a blocking operation that waits for complete deployment.
         """
         import subprocess
         import tempfile
         from pathlib import Path
 
-        job_id = str(uuid.uuid4())[:8]
         start_time = time.time()
 
-        # Store deployment job info
-        deployment_info = {
-            "job_id": job_id,
-            "model_name": request.model_name,
-            "experiment_name": request.experiment_name,
-            "status": "training",
-            "deployment_url": None,
-            "external_ip": None,
-            "model_version": None,
-            "run_id": None,
-            "ecr_image": None,
-            "error": None,
-            "created_at": datetime.utcnow(),
-            "completed_at": None,
-        }
+        print(f"🚀 Starting deployment for {request.model_name}...")
 
-        # Store in deployment jobs dict
-        with self.deployment_jobs_lock:
-            self.deployment_jobs[job_id] = deployment_info
+        # STEP 1: Train model
+        print(f"📚 [1/4] Training model...")
 
-        # Start deployment in background thread
-        thread = threading.Thread(
-            target=self._execute_full_deployment,
-            args=(job_id, request),
-        )
-        thread.daemon = True
-        thread.start()
-
-        # Return immediately with job ID
-        return {
-            "job_id": job_id,
-            "model_name": request.model_name,
-            "experiment_name": request.experiment_name,
-            "status": "training",
-            "message": f"Deployment started. Use /mlops/deployments/{job_id} to check status",
-        }
-
-    def _execute_full_deployment(self, job_id: str, request):
-        """Execute complete deployment workflow in background."""
         try:
-            # Get deployment info from storage
-            with self.deployment_jobs_lock:
-                if job_id not in self.deployment_jobs:
-                    return
-                deployment_info = self.deployment_jobs[job_id]
+            script_bytes = base64.b64decode(request.script_content)
+            script_text = script_bytes.decode("utf-8")
+        except:
+            script_text = request.script_content
 
-            # STEP 1: Train model
-            with self.deployment_jobs_lock:
-                deployment_info["status"] = "training"
-            print(f"🚀 [{job_id}] Starting training...")
+        training_result = self._run_training_sync(
+            script_text,
+            request.experiment_name,
+            request.model_name,
+            request.requirements or [],
+            request.environment_vars or {},
+            request.timeout,
+            request.tags or {},
+        )
 
-            training_request = {
-                "script_name": request.script_name,
-                "script_content": request.script_content,
-                "experiment_name": request.experiment_name,
-                "model_name": request.model_name,
-                "requirements": request.requirements or [],
-                "environment_vars": request.environment_vars or {},
-                "timeout": request.timeout,
-                "tags": request.tags or {},
-            }
+        if not training_result or not training_result.get("run_id"):
+            raise HTTPException(status_code=500, detail="Training failed")
 
-            # Execute training synchronously within this thread
-            from app.mlops.schemas import TrainingScriptUploadRequest
+        run_id = training_result["run_id"]
+        model_version = training_result.get("version", "1")
 
-            train_req = TrainingScriptUploadRequest(**training_request)
+        print(f"✅ Training completed: v{model_version}, run_id={run_id}")
 
-            # Decode and execute script
-            try:
-                script_bytes = base64.b64decode(request.script_content)
-                script_text = script_bytes.decode("utf-8")
-            except:
-                script_text = request.script_content
+        # STEP 2: Build Docker image
+        print(f"🐳 [2/4] Building Docker image...")
 
-            # Execute training
-            training_result = self._run_training_sync(
-                script_text,
-                request.experiment_name,
-                request.model_name,
-                request.requirements or [],
-                request.environment_vars or {},
-                request.timeout,
-                request.tags or {},
+        ecr_registry = os.getenv("ECR_REGISTRY", "637423187518.dkr.ecr.eu-north-1.amazonaws.com")
+        ecr_repo = os.getenv("ECR_REPO", "asgard-model")
+        aws_region = os.getenv("AWS_DEFAULT_REGION", "eu-north-1")
+
+        image_tag = f"{request.model_name.replace('_', '-')}-v{model_version}"
+        image_uri = f"{ecr_registry}/{ecr_repo}:{image_tag}"
+
+        if not self._build_docker_image(
+            request.model_name, model_version, run_id, image_uri, aws_region
+        ):
+            raise HTTPException(status_code=500, detail="Docker build failed")
+
+        print(f"✅ Image built: {image_uri}")
+
+        # STEP 3: Push to ECR
+        print(f"📤 [3/4] Pushing to ECR...")
+
+        if not self._push_to_ecr(image_uri, ecr_registry, aws_region):
+            raise HTTPException(status_code=500, detail="ECR push failed")
+
+        print(f"✅ Pushed to ECR")
+
+        # STEP 4: Deploy to K8s and wait for IP
+        print(f"☸️  [4/4] Deploying to Kubernetes...")
+
+        external_ip = self._deploy_to_k8s(
+            request.model_name,
+            model_version,
+            run_id,
+            image_uri,
+            request.namespace,
+            request.replicas,
+            aws_region,
+        )
+
+        if not external_ip:
+            raise HTTPException(
+                status_code=500, detail="K8s deployment failed or external IP not assigned"
             )
 
-            if not training_result or not training_result.get("run_id"):
-                with self.deployment_jobs_lock:
-                    deployment_info["status"] = "failed"
-                    deployment_info["error"] = "Training failed"
-                    deployment_info["completed_at"] = datetime.utcnow()
-                return
+        deployment_time = time.time() - start_time
 
-            with self.deployment_jobs_lock:
-                deployment_info["run_id"] = training_result["run_id"]
-                deployment_info["model_version"] = training_result.get("version", "1")
+        inference_url = f"http://{external_ip}"
 
-            print(f"✅ [{job_id}] Training completed: v{deployment_info['model_version']}")
+        print(f"🎉 Deployment complete in {deployment_time:.1f}s!")
+        print(f"   Inference URL: {inference_url}")
 
-            # STEP 2: Build Docker image
-            with self.deployment_jobs_lock:
-                deployment_info["status"] = "building"
-            print(f"🐳 [{job_id}] Building Docker image...")
-
-            ecr_registry = os.getenv(
-                "ECR_REGISTRY", "637423187518.dkr.ecr.eu-north-1.amazonaws.com"
-            )
-            ecr_repo = os.getenv("ECR_REPO", "asgard-model")
-            aws_region = os.getenv("AWS_DEFAULT_REGION", "eu-north-1")
-
-            image_tag = (
-                f"{request.model_name.replace('_', '-')}-v{deployment_info['model_version']}"
-            )
-            image_uri = f"{ecr_registry}/{ecr_repo}:{image_tag}"
-
-            # Build image
-            if not self._build_docker_image(
-                request.model_name,
-                deployment_info["model_version"],
-                deployment_info["run_id"],
-                image_uri,
-                aws_region,
-            ):
-                with self.deployment_jobs_lock:
-                    deployment_info["status"] = "failed"
-                    deployment_info["error"] = "Docker build failed"
-                    deployment_info["completed_at"] = datetime.utcnow()
-                return
-
-            with self.deployment_jobs_lock:
-                deployment_info["ecr_image"] = image_uri
-            print(f"✅ [{job_id}] Image built: {image_uri}")
-
-            # STEP 3: Push to ECR
-            with self.deployment_jobs_lock:
-                deployment_info["status"] = "pushing"
-            print(f"📤 [{job_id}] Pushing to ECR...")
-
-            if not self._push_to_ecr(image_uri, ecr_registry, aws_region):
-                with self.deployment_jobs_lock:
-                    deployment_info["status"] = "failed"
-                    deployment_info["error"] = "ECR push failed"
-                    deployment_info["completed_at"] = datetime.utcnow()
-                return
-
-            print(f"✅ [{job_id}] Pushed to ECR")
-
-            # STEP 4: Deploy to K8s
-            with self.deployment_jobs_lock:
-                deployment_info["status"] = "deploying"
-            print(f"☸️  [{job_id}] Deploying to Kubernetes...")
-
-            external_ip = self._deploy_to_k8s(
-                request.model_name,
-                deployment_info["model_version"],
-                deployment_info["run_id"],
-                image_uri,
-                request.namespace,
-                request.replicas,
-                aws_region,
-            )
-
-            if not external_ip:
-                with self.deployment_jobs_lock:
-                    deployment_info["status"] = "failed"
-                    deployment_info["error"] = "K8s deployment failed or IP not assigned"
-                    deployment_info["completed_at"] = datetime.utcnow()
-                return
-
-            with self.deployment_jobs_lock:
-                deployment_info["external_ip"] = external_ip
-                deployment_info["deployment_url"] = f"http://{external_ip}"
-                deployment_info["status"] = "deployed"
-                deployment_info["completed_at"] = datetime.utcnow()
-
-            print(f"🎉 [{job_id}] Deployment complete!")
-            print(f"   URL: {deployment_info['deployment_url']}")
-
-        except Exception as e:
-            with self.deployment_jobs_lock:
-                deployment_info["status"] = "failed"
-                deployment_info["error"] = str(e)
-                deployment_info["completed_at"] = datetime.utcnow()
-            print(f"❌ [{job_id}] Deployment failed: {e}")
+        # Return complete response
+        return {
+            "model_name": request.model_name,
+            "experiment_name": request.experiment_name,
+            "status": "deployed",
+            "inference_url": inference_url,
+            "external_ip": external_ip,
+            "model_version": model_version,
+            "run_id": run_id,
+            "ecr_image": image_uri,
+            "endpoints": {
+                "health": f"{inference_url}/health",
+                "metadata": f"{inference_url}/metadata",
+                "predict": f"{inference_url}/predict",
+                "root": inference_url,
+            },
+            "deployment_time_seconds": round(deployment_time, 2),
+            "message": f"Model deployed successfully! Use {inference_url}/predict for inference",
+        }
 
     def _run_training_sync(
         self, script_text, experiment_name, model_name, requirements, env_vars, timeout, tags
@@ -1111,32 +648,3 @@ spec:
         except Exception as e:
             print(f"Deploy error: {e}")
             return None
-
-    async def get_deployment_status(self, job_id: str) -> dict:
-        """Get status of a deployment job."""
-        with self.deployment_jobs_lock:
-            if job_id not in self.deployment_jobs:
-                raise HTTPException(status_code=404, detail=f"Deployment job {job_id} not found")
-
-            job = self.deployment_jobs[job_id]
-
-            # Calculate duration if completed
-            duration_seconds = None
-            if job["completed_at"] and job["created_at"]:
-                duration_seconds = (job["completed_at"] - job["created_at"]).total_seconds()
-
-            return {
-                "job_id": job["job_id"],
-                "model_name": job["model_name"],
-                "experiment_name": job["experiment_name"],
-                "status": job["status"],
-                "deployment_url": job["deployment_url"],
-                "external_ip": job["external_ip"],
-                "model_version": job["model_version"],
-                "run_id": job["run_id"],
-                "ecr_image": job["ecr_image"],
-                "error": job["error"],
-                "created_at": job["created_at"],
-                "completed_at": job["completed_at"],
-                "duration_seconds": duration_seconds,
-            }
