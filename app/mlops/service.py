@@ -700,7 +700,7 @@ async def root():
                         client.V1Volume(
                             name="kaniko-secret",
                             secret=client.V1SecretVolumeSource(
-                                secret_name="ecr-credentials",
+                                secret_name="ecr-secret",
                                 items=[client.V1KeyToPath(key=".dockerconfigjson", path="config.json")]
                             )
                         )
@@ -792,7 +792,7 @@ async def root():
                     template=client.V1PodTemplateSpec(
                         metadata=client.V1ObjectMeta(labels={"app": deployment_name}),
                         spec=client.V1PodSpec(
-                            image_pull_secrets=[client.V1LocalObjectReference(name="ecr-credentials")],
+                            image_pull_secrets=[client.V1LocalObjectReference(name="ecr-secret")],
                             containers=[
                                 client.V1Container(
                                     name="inference",
