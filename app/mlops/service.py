@@ -350,7 +350,8 @@ from mlflow.tracking import MlflowClient
 # MLflow configuration
 os.environ['MLFLOW_TRACKING_URI'] = '{self.mlflow_tracking_uri}'
 os.environ['MLFLOW_ENABLE_SYSTEM_METRICS_LOGGING'] = 'false'
-os.environ['MLFLOW_ENABLE_PROXY_MLMODEL_ARTIFACT_LOGGING'] = 'false'
+os.environ['MLFLOW_LOGGED_MODELS_ENABLE'] = 'false'
+os.environ['GIT_PYTHON_REFRESH'] = 'quiet'
 
 mlflow.set_tracking_uri('{self.mlflow_tracking_uri}')
 mlflow.set_experiment('{experiment_name}')
@@ -400,7 +401,8 @@ print(f"   Model name: {model_name}")
                 env = os.environ.copy()
                 env["MLFLOW_TRACKING_URI"] = self.mlflow_tracking_uri
                 env["MLFLOW_ENABLE_SYSTEM_METRICS_LOGGING"] = "false"
-                env["MLFLOW_ENABLE_PROXY_MLMODEL_ARTIFACT_LOGGING"] = "false"
+                env["MLFLOW_LOGGED_MODELS_ENABLE"] = "false"
+                env["GIT_PYTHON_REFRESH"] = "quiet"
                 env["EXPERIMENT_NAME"] = experiment_name
                 env["MODEL_NAME"] = model_name
                 env.update(env_vars)
