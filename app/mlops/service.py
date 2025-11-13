@@ -349,12 +349,20 @@ from mlflow.tracking import MlflowClient
 
 # MLflow configuration
 os.environ['MLFLOW_TRACKING_URI'] = '{self.mlflow_tracking_uri}'
-os.environ['MLFLOW_ENABLE_SYSTEM_METRICS_LOGGING'] = 'false'
-os.environ['MLFLOW_LOGGED_MODELS_ENABLE'] = 'false'
 os.environ['GIT_PYTHON_REFRESH'] = 'quiet'
 
 mlflow.set_tracking_uri('{self.mlflow_tracking_uri}')
 mlflow.set_experiment('{experiment_name}')
+
+# Monkey-patch to disable logged models feature (compatibility fix)
+try:
+    from mlflow.tracking import fluent
+    original_create_logged_model = fluent._create_logged_model
+    def _patched_create_logged_model(*args, **kwargs):
+        return None
+    fluent._create_logged_model = _patched_create_logged_model
+except:
+    pass
 
 print(f"✅ MLflow configured:")
 print(f"   Tracking URI: {self.mlflow_tracking_uri}")
