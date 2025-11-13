@@ -367,8 +367,8 @@ try:
     TrackingServiceClient.create_logged_model = patched_create_logged_model
     
     print("🔧 Applied MLflow compatibility patch (disabled logged_model for MLflow < 2.14)")
-except Exception as e:
-    print(f"⚠️  Could not apply MLflow patch: {e}")
+except Exception as ex:
+    print(f"⚠️  Could not apply MLflow patch: {{ex}}")
 
 print(f"✅ MLflow configured:")
 print(f"   Tracking URI: {self.mlflow_tracking_uri}")
