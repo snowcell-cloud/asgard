@@ -249,8 +249,10 @@ class MLOpsService:
 
         run_id = training_result["run_id"]
         model_version = training_result.get("version", "1")
+        model_path = training_result.get("model_path")
 
         print(f"✅ Training completed: v{model_version}, run_id={run_id}")
+        print(f"✅ Model path: {model_path}")
 
         # STEP 2: Build Docker image
         print(f"🐳 [2/4] Building Docker image...")
@@ -263,7 +265,7 @@ class MLOpsService:
         image_uri = f"{ecr_registry}/{ecr_repo}:{image_tag}"
 
         if not self._build_docker_image(
-            request.model_name, model_version, run_id, image_uri, aws_region
+            request.model_name, model_version, run_id, image_uri, aws_region, model_path
         ):
             raise HTTPException(status_code=500, detail="Docker build failed")
 
@@ -446,31 +448,36 @@ print(f"   To save your model: pickle.dump(model, open(MODEL_PATH, 'wb'))")
 
                 print(f"✅ Script executed successfully")
 
-                # Check if model was saved
-                model_path = Path(tmpdir) / "model_artifacts" / "model.pkl"
-                if not model_path.exists():
+                # Check if model was saved in the temp directory
+                model_dir = Path(tmpdir) / "model_artifacts"
+                model_file = model_dir / "model.pkl"
+                
+                if not model_file.exists():
                     error_msg = (
-                        f"No model file found at {model_path}.\n\n"
-                        f"Your script MUST save the trained model:\n"
-                        f"  import pickle\n"
+                        f"No model file found at {model_file}.\n\n"
+                        f"Your script MUST save the trained model using:\n"
                         f"  pickle.dump(model, open(MODEL_PATH, 'wb'))\n\n"
-                        f"The MODEL_PATH variable is pre-configured in your script."
+                        f"The MODEL_PATH variable is automatically set in your script."
                     )
                     print(f"❌ {error_msg}")
                     raise Exception(error_msg)
 
-                print(f"✅ Model file found: {model_path}")
+                print(f"✅ Model file found: {model_file}")
 
-                # Copy model to a persistent location for Docker build
-                persistent_model_path = Path(tmpdir) / "saved_model.pkl"
-                import shutil
-                shutil.copy(model_path, persistent_model_path)
+                # Copy model to a location outside temp directory for Docker build
+                persistent_dir = Path("/tmp/asgard_models")
+                persistent_dir.mkdir(exist_ok=True)
                 
                 # Generate a simple run_id
                 import uuid
-                run_id = str(uuid.uuid4())
+                run_id = str(uuid.uuid4())[:8]
                 
-                print(f"✅ Model saved with ID: {run_id}")
+                persistent_model_path = persistent_dir / f"model_{run_id}.pkl"
+                import shutil
+                shutil.copy(model_file, persistent_model_path)
+                
+                print(f"✅ Model saved to persistent location: {persistent_model_path}")
+                print(f"✅ Model ID: {run_id}")
 
                 return {
                     "run_id": run_id,
@@ -489,42 +496,47 @@ print(f"   To save your model: pickle.dump(model, open(MODEL_PATH, 'wb'))")
             # Re-raise the exception so the caller can handle it
             raise
 
-    def _build_docker_image(self, model_name, model_version, run_id, image_uri, aws_region):
+    def _build_docker_image(self, model_name, model_version, run_id, image_uri, aws_region, model_path=None):
         """Build Docker image for model inference."""
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
                 tmpdir_path = Path(tmpdir)
 
-                # Create Dockerfile
+                # Copy model file to build context
+                if model_path and Path(model_path).exists():
+                    import shutil
+                    shutil.copy(model_path, tmpdir_path / "model.pkl")
+                    print(f"✅ Copied model from {model_path} to build context")
+
+                # Create Dockerfile (minimal, no MLflow)
                 dockerfile = tmpdir_path / "Dockerfile"
                 dockerfile.write_text(
                     f"""FROM python:3.11-slim as builder
-RUN pip install --no-cache-dir --user mlflow==2.16.2 fastapi==0.104.1 uvicorn[standard]==0.24.0 scikit-learn==1.3.2 pandas==2.1.3 numpy==1.26.2 boto3==1.34.0 python-multipart==0.0.6
+RUN pip install --no-cache-dir --user fastapi==0.104.1 uvicorn[standard]==0.24.0 scikit-learn==1.3.2 pandas==2.1.3 numpy==1.26.2 python-multipart==0.0.6
 
 FROM python:3.11-slim
 COPY --from=builder /root/.local /root/.local
 ENV PATH=/root/.local/bin:$PATH
 WORKDIR /app
-ENV MLFLOW_TRACKING_URI=http://mlflow-service.asgard.svc.cluster.local:5000
 ENV MODEL_NAME={model_name}
 ENV MODEL_VERSION={model_version}
 ENV RUN_ID={run_id}
-ENV AWS_DEFAULT_REGION={aws_region}
 COPY inference_service.py /app/
+COPY model.pkl /app/
 EXPOSE 80
 CMD ["uvicorn", "inference_service:app", "--host", "0.0.0.0", "--port", "80"]
 """
                 )
 
-                # Create inference service
+                # Create inference service (pickle-based, no MLflow)
                 inference_service = tmpdir_path / "inference_service.py"
                 inference_service.write_text(
                     """import os
 import logging
+import pickle
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import mlflow.pyfunc
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -534,18 +546,16 @@ app = FastAPI(title="Model Inference API", version="1.0.0")
 model_name = os.getenv("MODEL_NAME")
 model_version = os.getenv("MODEL_VERSION")
 run_id = os.getenv("RUN_ID")
-mlflow_uri = os.getenv("MLFLOW_TRACKING_URI")
 model = None
 
 @app.on_event("startup")
 async def load_model():
     global model
     try:
-        import mlflow
-        mlflow.set_tracking_uri(mlflow_uri)
-        model_uri = f"runs:/{run_id}/model"
-        model = mlflow.pyfunc.load_model(model_uri)
-        logger.info(f"Model loaded: {model_name} v{model_version}")
+        model_path = "/app/model.pkl"
+        with open(model_path, 'rb') as f:
+            model = pickle.load(f)
+        logger.info(f"Model loaded from {model_path}: {model_name} v{model_version}")
     except Exception as e:
         logger.error(f"Failed to load model: {e}")
 
@@ -561,7 +571,7 @@ async def health():
 
 @app.get("/metadata")
 async def metadata():
-    return {"model_name": model_name, "model_version": model_version, "run_id": run_id, "mlflow_uri": mlflow_uri, "model_loaded": model is not None}
+    return {"model_name": model_name, "model_version": model_version, "run_id": run_id, "model_loaded": model is not None}
 
 @app.post("/predict", response_model=PredictResponse)
 async def predict(request: PredictRequest):
@@ -569,6 +579,7 @@ async def predict(request: PredictRequest):
         raise HTTPException(status_code=503, detail="Model not loaded")
     try:
         import pandas as pd
+        import numpy as np
         df = pd.DataFrame(request.inputs)
         predictions = model.predict(df)
         return {"predictions": predictions.tolist() if hasattr(predictions, "tolist") else list(predictions)}
@@ -577,7 +588,7 @@ async def predict(request: PredictRequest):
 
 @app.get("/")
 async def root():
-    return {"service": "Model Inference API", "model": model_name, "version": model_version}
+    return {"service": "Model Inference API (Pickle)", "model": model_name, "version": model_version}
 """
                 )
 
