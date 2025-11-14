@@ -19,6 +19,7 @@ from app.mlops.schemas import (
     MLOpsStatus,
     DeployModelRequest,
     DeployModelResponse,
+    DeploymentStatusResponse,
 )
 from app.mlops.service import MLOpsService
 
@@ -82,17 +83,15 @@ async def deploy_model(
     service: MLOpsService = Depends(get_service),
 ) -> DeployModelResponse:
     """
-    🚀 **SINGLE-CLICK DEPLOYMENT**: Complete ML Deployment in One API Call
+    🚀 **ASYNC DEPLOYMENT**: Submit ML Deployment Request
 
-    **This endpoint waits for complete deployment and returns the inference URL!**
+    **This endpoint returns immediately with a deployment_id!**
 
-    **Workflow (all automatic):**
-    1. ✅ Train model using provided Python script
-    2. ✅ Build optimized Docker image (multi-stage)
-    3. ✅ Push image to AWS ECR
-    4. ✅ Deploy to Kubernetes with LoadBalancer
-    5. ✅ Wait for external IP assignment
-    6. ✅ **Return inference URL immediately** 🎯
+    **Workflow:**
+    1. Submit deployment request
+    2. Receive `deployment_id` immediately
+    3. Poll GET `/mlops/deployments/{deployment_id}` for status
+    4. Get inference URL when status is "deployed"
 
     **Example Request:**
     ```bash
@@ -112,76 +111,100 @@ async def deploy_model(
       }'
     ```
 
-    **Response (after complete deployment):**
+    **Response (immediate):**
     ```json
     {
+      "deployment_id": "550e8400-e29b-41d4-a716-446655440000",
       "model_name": "customer_churn_model",
-      "experiment_name": "production_experiment",
-      "status": "deployed",
-      "inference_url": "http://51.89.136.142",
-      "external_ip": "51.89.136.142",
-      "model_version": "1",
-      "run_id": "abc123def456",
-      "ecr_image": "637423187518.dkr.ecr.eu-north-1.amazonaws.com/asgard-model:customer-churn-model-v1",
-      "endpoints": {
-        "health": "http://51.89.136.142/health",
-        "metadata": "http://51.89.136.142/metadata",
-        "predict": "http://51.89.136.142/predict",
-        "root": "http://51.89.136.142"
-      },
-      "deployment_time_seconds": 245.3,
-      "message": "Model deployed successfully! Use http://51.89.136.142/predict for inference"
+      "status": "submitted",
+      "message": "Deployment submitted successfully. Use GET /mlops/deployments/{deployment_id} to check status."
     }
     ```
 
-    **🎯 IMMEDIATE NEXT STEPS:**
-    
-    Once you get the response, your model is ready! Use the `inference_url`:
-    
-    **1. Health Check**
+    **Check Status:**
     ```bash
-    curl http://51.89.136.142/health
+    curl http://localhost:8000/mlops/deployments/550e8400-e29b-41d4-a716-446655440000
     ```
-    
-    **2. Make Predictions** ⭐
-    ```bash
-    curl -X POST http://51.89.136.142/predict \\
-      -H "Content-Type: application/json" \\
-      -d '{
-        "inputs": {
-          "feature1": [1, 2, 3],
-          "feature2": [4, 5, 6]
-        }
-      }'
-    ```
-    Response: `{"predictions": [0, 1, 1]}`
-    
-    **3. Get Metadata**
-    ```bash
-    curl http://51.89.136.142/metadata
-    ```
-
-    **⚠️ IMPORTANT NOTES:**
-    - This is a **synchronous** operation (waits for completion)
-    - Average deployment time: **3-5 minutes**
-    - Request may take several minutes to complete
-    - Set appropriate timeout on client side (600+ seconds recommended)
-    - No need to poll for status - response contains everything!
-    - Inference URL is returned directly in the response
-    
-    **💡 TIPS:**
-    - Save the `inference_url` for future predictions
-    - Use `endpoints.predict` for making predictions
-    - Each model gets its own dedicated URL
-    - Models scale independently with K8s replicas
-    - Health checks available at `endpoints.health`
 
     **Script Requirements:**
     - Must use `mlflow.start_run()` to create a run
     - Must call `mlflow.sklearn.log_model()` to save the model
     - Can use any ML framework (sklearn, xgboost, tensorflow, etc.)
     """
-    return await service.deploy_model_end_to_end(request)
+    return await service.submit_deployment(request)
+
+
+@router.get("/deployments/{deployment_id}", response_model=DeploymentStatusResponse)
+async def get_deployment_status(
+    deployment_id: str,
+    service: MLOpsService = Depends(get_service),
+) -> DeploymentStatusResponse:
+    """
+    📊 **GET DEPLOYMENT STATUS**: Check deployment progress and get inference URL
+
+    **Status Values:**
+    - `submitted`: Deployment request received, waiting to start
+    - `running`: Deployment in progress (training/building/deploying)
+    - `deployed`: Deployment completed successfully, inference URL available
+    - `failed`: Deployment failed, check error field
+
+    **Example Request:**
+    ```bash
+    curl http://localhost:8000/mlops/deployments/550e8400-e29b-41d4-a716-446655440000
+    ```
+
+    **Response (while running):**
+    ```json
+    {
+      "deployment_id": "550e8400-e29b-41d4-a716-446655440000",
+      "model_name": "customer_churn_model",
+      "experiment_name": "production_experiment",
+      "status": "running",
+      "progress": "Building Docker image...",
+      "submitted_at": "2025-11-14T10:00:00",
+      "started_at": "2025-11-14T10:00:05",
+      "completed_at": null,
+      "inference_url": null,
+      "external_ip": null,
+      "run_id": "abc123",
+      "model_version": null,
+      "ecr_image": null,
+      "endpoints": null,
+      "error": null
+    }
+    ```
+
+    **Response (when deployed):**
+    ```json
+    {
+      "deployment_id": "550e8400-e29b-41d4-a716-446655440000",
+      "model_name": "customer_churn_model",
+      "experiment_name": "production_experiment",
+      "status": "deployed",
+      "progress": "Deployment completed successfully",
+      "submitted_at": "2025-11-14T10:00:00",
+      "started_at": "2025-11-14T10:00:05",
+      "completed_at": "2025-11-14T10:04:30",
+      "inference_url": "http://51.89.136.142",
+      "external_ip": "51.89.136.142",
+      "run_id": "abc123",
+      "model_version": "1",
+      "ecr_image": "637423187518.dkr.ecr.eu-north-1.amazonaws.com/asgard-model:customer-churn-model-v1",
+      "endpoints": {
+        "health": "http://51.89.136.142/health",
+        "metadata": "http://51.89.136.142/metadata",
+        "predict": "http://51.89.136.142/predict"
+      },
+      "error": null
+    }
+    ```
+
+    **Usage:**
+    - Poll this endpoint every 10-30 seconds
+    - When status is "deployed", use `inference_url` for predictions
+    - If status is "failed", check `error` field for details
+    """
+    return await service.get_deployment_status(deployment_id)
 
 
 # ============================================================================

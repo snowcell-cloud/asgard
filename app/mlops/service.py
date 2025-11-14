@@ -15,6 +15,8 @@ import base64
 import subprocess
 import tempfile
 import time
+import asyncio
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -53,6 +55,9 @@ class MLOpsService:
 
         # Initialize deployment service for automated model deployment
         self.deployment_service = ModelDeploymentService()
+
+        # Deployment tracking storage (in-memory)
+        self.deployments: Dict[str, Dict[str, Any]] = {}
 
         print(f"✅ MLOpsService initialized")
         print(f"   MLflow: {self.mlflow_tracking_uri}")
@@ -154,25 +159,101 @@ class MLOpsService:
     # End-to-End Deployment (/deploy)
     # ========================================================================
 
-    async def deploy_model_end_to_end(self, request) -> dict:
-        """
-        Complete model deployment pipeline - SYNCHRONOUS:
-        1. Train model via uploaded script
-        2. Build Docker image
-        3. Push to ECR
-        4. Deploy to K8s with LoadBalancer
-        5. Wait for external IP
-        6. Return inference URL
+    async def submit_deployment(self, request) -> dict:
+        """Submit deployment request and return immediately with deployment_id."""
+        deployment_id = str(uuid.uuid4())
 
-        This is a blocking operation that waits for complete deployment.
-        """
+        # Initialize deployment tracking
+        self.deployments[deployment_id] = {
+            "deployment_id": deployment_id,
+            "model_name": request.model_name,
+            "experiment_name": request.experiment_name,
+            "status": "submitted",
+            "submitted_at": datetime.utcnow(),
+            "started_at": None,
+            "completed_at": None,
+            "inference_url": None,
+            "external_ip": None,
+            "run_id": None,
+            "model_version": None,
+            "ecr_image": None,
+            "endpoints": None,
+            "error": None,
+            "progress": "Deployment submitted, waiting to start...",
+        }
+
+        # Start deployment in background thread (not blocking)
+        thread = threading.Thread(
+            target=self._run_deployment_background, args=(deployment_id, request), daemon=True
+        )
+        thread.start()
+
+        return {
+            "deployment_id": deployment_id,
+            "model_name": request.model_name,
+            "status": "submitted",
+            "message": f"Deployment submitted successfully. Use GET /mlops/deployments/{deployment_id} to check status.",
+        }
+
+    def _run_deployment_background(self, deployment_id: str, request):
+        """Run deployment in background thread."""
+        try:
+            # Update status to running
+            self.deployments[deployment_id].update(
+                {
+                    "status": "running",
+                    "started_at": datetime.utcnow(),
+                    "progress": "Training model...",
+                }
+            )
+
+            # Run the synchronous deployment
+            result = asyncio.run(self._deploy_model_sync(deployment_id, request))
+
+            # Update with success
+            self.deployments[deployment_id].update(
+                {
+                    "status": "deployed",
+                    "completed_at": datetime.utcnow(),
+                    "inference_url": result["inference_url"],
+                    "external_ip": result["external_ip"],
+                    "run_id": result["run_id"],
+                    "model_version": result["model_version"],
+                    "ecr_image": result["ecr_image"],
+                    "endpoints": result["endpoints"],
+                    "progress": "Deployment completed successfully",
+                }
+            )
+        except Exception as e:
+            # Update with failure
+            self.deployments[deployment_id].update(
+                {
+                    "status": "failed",
+                    "completed_at": datetime.utcnow(),
+                    "error": str(e),
+                    "progress": f"Deployment failed: {str(e)}",
+                }
+            )
+
+    async def get_deployment_status(self, deployment_id: str) -> dict:
+        """Get deployment status and details."""
+        if deployment_id not in self.deployments:
+            raise HTTPException(status_code=404, detail=f"Deployment {deployment_id} not found")
+
+        return self.deployments[deployment_id]
+
+    async def _deploy_model_sync(self, deployment_id: str, request) -> dict:
+        """Internal synchronous deployment method (same as old deploy_model_end_to_end)."""
         import subprocess
         import tempfile
         from pathlib import Path
 
         start_time = time.time()
 
-        print(f"🚀 Starting deployment for {request.model_name}...")
+        print(f"🚀 Starting deployment {deployment_id} for {request.model_name}...")
+
+        # Update progress
+        self.deployments[deployment_id]["progress"] = "Training model..."
 
         # STEP 1: Train model
         print(f"📚 [1/4] Training model...")
@@ -188,7 +269,7 @@ class MLOpsService:
             # If decode fails, assume it's already plain text
             print(f"⚠️  Base64 decode failed, using as plain text: {decode_error}")
             script_text = request.script_content
-        
+
         print(f"📝 Script preview (first 200 chars):\n{script_text[:200]}...")
 
         try:
@@ -208,7 +289,7 @@ class MLOpsService:
             error_msg = f"Training failed: {str(training_error)}"
             print(f"❌ {error_msg}")
             print(f"❌ Full traceback:\n{error_detail}")
-            
+
             # Create detailed error message
             full_error_msg = (
                 f"Training Failed\n\n"
@@ -220,8 +301,8 @@ class MLOpsService:
                 f"4. Example frameworks: sklearn, xgboost, tensorflow, pytorch\n\n"
                 f"Traceback:\n{error_detail}"
             )
-            
-            raise HTTPException(status_code=500, detail=full_error_msg)
+
+            raise Exception(full_error_msg)
 
         if not training_result or not training_result.get("run_id"):
             error_msg = (
@@ -245,16 +326,21 @@ class MLOpsService:
                 "      mlflow.log_metric('accuracy', accuracy)\n"
             )
             print(f"❌ {error_msg}")
-            raise HTTPException(status_code=500, detail=error_msg)
+            raise Exception(error_msg)
 
         run_id = training_result["run_id"]
-        model_version = training_result.get("version", "1")
+        model_version = training_result.get("version", "latest")
         model_path = training_result.get("model_path")
+
+        # Update progress
+        self.deployments[deployment_id]["progress"] = "Building Docker image..."
+        self.deployments[deployment_id]["run_id"] = run_id
 
         print(f"✅ Training completed: v{model_version}, run_id={run_id}")
         print(f"✅ Model path: {model_path}")
 
         # STEP 2: Build Docker image
+        self.deployments[deployment_id]["progress"] = "Building Docker image..."
         print(f"🐳 [2/4] Building Docker image...")
 
         ecr_registry = os.getenv("ECR_REGISTRY", "637423187518.dkr.ecr.eu-north-1.amazonaws.com")
@@ -267,19 +353,16 @@ class MLOpsService:
         if not self._build_docker_image(
             request.model_name, model_version, run_id, image_uri, aws_region, model_path
         ):
-            raise HTTPException(status_code=500, detail="Docker build failed")
+            raise Exception("Docker build failed")
 
         print(f"✅ Image built: {image_uri}")
 
-        # STEP 3: Push to ECR
-        print(f"📤 [3/4] Pushing to ECR...")
-
-        if not self._push_to_ecr(image_uri, ecr_registry, aws_region):
-            raise HTTPException(status_code=500, detail="ECR push failed")
-
-        print(f"✅ Pushed to ECR")
+        # STEP 3: Push to ECR (handled by Kaniko)
+        self.deployments[deployment_id]["progress"] = "Pushing to ECR..."
+        print(f"📤 [3/4] Image pushed by Kaniko")
 
         # STEP 4: Deploy to K8s and wait for IP
+        self.deployments[deployment_id]["progress"] = "Deploying to Kubernetes..."
         print(f"☸️  [4/4] Deploying to Kubernetes...")
 
         external_ip = self._deploy_to_k8s(
@@ -293,15 +376,11 @@ class MLOpsService:
         )
 
         if not external_ip:
-            raise HTTPException(
-                status_code=500, detail="K8s deployment failed or external IP not assigned"
-            )
-
-        deployment_time = time.time() - start_time
+            raise Exception("K8s deployment failed or external IP not assigned")
 
         inference_url = f"http://{external_ip}"
 
-        print(f"🎉 Deployment complete in {deployment_time:.1f}s!")
+        print(f"🎉 Deployment complete!")
         print(f"   Inference URL: {inference_url}")
 
         # Return complete response
@@ -320,9 +399,15 @@ class MLOpsService:
                 "predict": f"{inference_url}/predict",
                 "root": inference_url,
             },
-            "deployment_time_seconds": round(deployment_time, 2),
-            "message": f"Model deployed successfully! Use {inference_url}/predict for inference",
         }
+
+    async def deploy_model_end_to_end(self, request) -> dict:
+        """
+        Legacy synchronous deployment method - kept for compatibility.
+        Use submit_deployment() instead for async operation.
+        """
+        deployment_id = "sync_" + str(uuid.uuid4())
+        return await self._deploy_model_sync(deployment_id, request)
 
     def _run_training_sync(
         self, script_text, experiment_name, model_name, requirements, env_vars, timeout, tags
@@ -373,7 +458,7 @@ print(f"   To save your model: pickle.dump(model, open(MODEL_PATH, 'wb'))")
                 # Add the user's script
                 injected_script += "# ========== User Training Script ==========\n"
                 injected_script += script_text
-                
+
                 # Write the complete script
                 script_path.write_text(injected_script)
 
@@ -412,7 +497,9 @@ print(f"   To save your model: pickle.dump(model, open(MODEL_PATH, 'wb'))")
                     f"   Python: {subprocess.run(['which', 'python'], capture_output=True, text=True).stdout.strip()}"
                 )
                 print(f"   Working dir: {tmpdir}")
-                print(f"   Environment vars: MLFLOW_TRACKING_URI, EXPERIMENT_NAME, MODEL_NAME + {len(env_vars)} custom vars")
+                print(
+                    f"   Environment vars: MLFLOW_TRACKING_URI, EXPERIMENT_NAME, MODEL_NAME + {len(env_vars)} custom vars"
+                )
 
                 # Execute the training script
                 result = subprocess.run(
@@ -427,13 +514,13 @@ print(f"   To save your model: pickle.dump(model, open(MODEL_PATH, 'wb'))")
                 print(f"\n{'='*60}")
                 print(f"Script execution completed: returncode={result.returncode}")
                 print(f"{'='*60}")
-                
+
                 if result.stdout:
                     print(f"STDOUT:\n{result.stdout}")
-                
+
                 if result.stderr:
                     print(f"STDERR:\n{result.stderr}")
-                    
+
                 print(f"{'='*60}\n")
 
                 # Check if script executed successfully
@@ -451,7 +538,7 @@ print(f"   To save your model: pickle.dump(model, open(MODEL_PATH, 'wb'))")
                 # Check if model was saved in the temp directory
                 model_dir = Path(tmpdir) / "model_artifacts"
                 model_file = model_dir / "model.pkl"
-                
+
                 if not model_file.exists():
                     error_msg = (
                         f"No model file found at {model_file}.\n\n"
@@ -467,22 +554,24 @@ print(f"   To save your model: pickle.dump(model, open(MODEL_PATH, 'wb'))")
                 # Copy model to a location outside temp directory for Docker build
                 persistent_dir = Path("/tmp/asgard_models")
                 persistent_dir.mkdir(exist_ok=True)
-                
+
                 # Generate a simple run_id
                 import uuid
+
                 run_id = str(uuid.uuid4())[:8]
-                
+
                 persistent_model_path = persistent_dir / f"model_{run_id}.pkl"
                 import shutil
+
                 shutil.copy(model_file, persistent_model_path)
-                
+
                 print(f"✅ Model saved to persistent location: {persistent_model_path}")
                 print(f"✅ Model ID: {run_id}")
 
                 return {
                     "run_id": run_id,
                     "version": "latest",
-                    "model_path": str(persistent_model_path)
+                    "model_path": str(persistent_model_path),
                 }
 
         except subprocess.TimeoutExpired:
@@ -492,36 +581,40 @@ print(f"   To save your model: pickle.dump(model, open(MODEL_PATH, 'wb'))")
         except Exception as e:
             print(f"❌ Training error: {e}")
             import traceback
+
             traceback.print_exc()
             # Re-raise the exception so the caller can handle it
             raise
 
-    def _build_docker_image(self, model_name, model_version, run_id, image_uri, aws_region, model_path=None):
+    def _build_docker_image(
+        self, model_name, model_version, run_id, image_uri, aws_region, model_path=None
+    ):
         """Build Docker image for model inference using Kaniko in Kubernetes."""
         try:
             from kubernetes import client, config
-            
+
             # Load in-cluster config
             try:
                 config.load_incluster_config()
             except:
                 config.load_kube_config()
-            
+
             v1 = client.CoreV1Api()
             namespace = os.getenv("NAMESPACE", "asgard")
-            
+
             print(f"🔨 Building image with Kaniko: {image_uri}")
-            
+
             # Create a unique build context directory
             build_id = run_id[:8]
             build_context_path = f"/tmp/build_context_{build_id}"
             Path(build_context_path).mkdir(exist_ok=True)
-            
+
             tmpdir_path = Path(build_context_path)
 
             # Copy model file to build context
             if model_path and Path(model_path).exists():
                 import shutil
+
                 shutil.copy(model_path, tmpdir_path / "model.pkl")
                 print(f"✅ Copied model from {model_path} to build context")
             else:
@@ -614,36 +707,38 @@ async def root():
 
             # Create tar archive of build context for Kaniko
             import tarfile
+
             tar_path = f"/tmp/build_context_{build_id}.tar.gz"
             print(f"📦 Creating build context archive: {tar_path}")
-            
+
             with tarfile.open(tar_path, "w:gz") as tar:
                 tar.add(tmpdir_path, arcname=".")
-            
+
             print(f"✅ Build context created: {tar_path}")
 
             # Create Kaniko build pod
             namespace = os.getenv("NAMESPACE", "asgard")
             kaniko_pod_name = f"kaniko-build-{build_id}"
-            
+
             # Get AWS credentials for ECR
             aws_key = os.getenv("AWS_ACCESS_KEY_ID", "")
             aws_secret = os.getenv("AWS_SECRET_ACCESS_KEY", "")
-            
+
             # Create ConfigMap with build context
             print(f"📤 Creating ConfigMap with build context...")
-            
+
             # Read tar content as base64
             import base64
-            with open(tar_path, 'rb') as f:
+
+            with open(tar_path, "rb") as f:
                 tar_content = base64.b64encode(f.read()).decode()
-            
+
             # Create ConfigMap using Kubernetes client
             configmap = client.V1ConfigMap(
                 metadata=client.V1ObjectMeta(name=f"build-context-{build_id}", namespace=namespace),
-                data={"context.tar.gz": tar_content}
+                data={"context.tar.gz": tar_content},
             )
-            
+
             try:
                 v1.create_namespaced_config_map(namespace=namespace, body=configmap)
                 print(f"✅ ConfigMap created: build-context-{build_id}")
@@ -653,7 +748,7 @@ async def root():
 
             # Create Kaniko pod for building using Kubernetes client
             print(f"🚀 Creating Kaniko build pod: {kaniko_pod_name}")
-            
+
             pod = client.V1Pod(
                 metadata=client.V1ObjectMeta(name=kaniko_pod_name, namespace=namespace),
                 spec=client.V1PodSpec(
@@ -662,11 +757,15 @@ async def root():
                         client.V1Container(
                             name="extract-context",
                             image="busybox",
-                            command=["sh", "-c", "cd /workspace && base64 -d /config/context.tar.gz > context.tar.gz && tar -xzf context.tar.gz && ls -la /workspace"],
+                            command=[
+                                "sh",
+                                "-c",
+                                "cd /workspace && base64 -d /config/context.tar.gz > context.tar.gz && tar -xzf context.tar.gz && ls -la /workspace",
+                            ],
                             volume_mounts=[
                                 client.V1VolumeMount(name="workspace", mount_path="/workspace"),
-                                client.V1VolumeMount(name="build-context", mount_path="/config")
-                            ]
+                                client.V1VolumeMount(name="build-context", mount_path="/config"),
+                            ],
                         )
                     ],
                     containers=[
@@ -678,36 +777,44 @@ async def root():
                                 "--dockerfile=/workspace/Dockerfile",
                                 f"--destination={image_uri}",
                                 "--cache=true",
-                                "--compressed-caching=false"
+                                "--compressed-caching=false",
                             ],
                             env=[
                                 client.V1EnvVar(name="AWS_ACCESS_KEY_ID", value=aws_key),
                                 client.V1EnvVar(name="AWS_SECRET_ACCESS_KEY", value=aws_secret),
-                                client.V1EnvVar(name="AWS_REGION", value=aws_region)
+                                client.V1EnvVar(name="AWS_REGION", value=aws_region),
                             ],
                             volume_mounts=[
                                 client.V1VolumeMount(name="workspace", mount_path="/workspace"),
-                                client.V1VolumeMount(name="kaniko-secret", mount_path="/kaniko/.docker")
-                            ]
+                                client.V1VolumeMount(
+                                    name="kaniko-secret", mount_path="/kaniko/.docker"
+                                ),
+                            ],
                         )
                     ],
                     volumes=[
-                        client.V1Volume(name="workspace", empty_dir=client.V1EmptyDirVolumeSource()),
+                        client.V1Volume(
+                            name="workspace", empty_dir=client.V1EmptyDirVolumeSource()
+                        ),
                         client.V1Volume(
                             name="build-context",
-                            config_map=client.V1ConfigMapVolumeSource(name=f"build-context-{build_id}")
+                            config_map=client.V1ConfigMapVolumeSource(
+                                name=f"build-context-{build_id}"
+                            ),
                         ),
                         client.V1Volume(
                             name="kaniko-secret",
                             secret=client.V1SecretVolumeSource(
                                 secret_name="ecr-secret",
-                                items=[client.V1KeyToPath(key=".dockerconfigjson", path="config.json")]
-                            )
-                        )
-                    ]
-                )
+                                items=[
+                                    client.V1KeyToPath(key=".dockerconfigjson", path="config.json")
+                                ],
+                            ),
+                        ),
+                    ],
+                ),
             )
-            
+
             try:
                 v1.create_namespaced_pod(namespace=namespace, body=pod)
                 print(f"✅ Kaniko pod created, waiting for build to complete...")
@@ -718,26 +825,32 @@ async def root():
             # Wait for pod to complete (max 10 minutes)
             for i in range(120):
                 time.sleep(5)
-                
+
                 try:
-                    pod_status = v1.read_namespaced_pod_status(name=kaniko_pod_name, namespace=namespace)
+                    pod_status = v1.read_namespaced_pod_status(
+                        name=kaniko_pod_name, namespace=namespace
+                    )
                     phase = pod_status.status.phase
-                    
+
                     print(f"⏳ Build status: {phase} ({i*5}s elapsed)")
-                    
+
                     if phase == "Succeeded":
                         print(f"✅ Image built and pushed successfully!")
                         # Cleanup
                         try:
                             v1.delete_namespaced_pod(name=kaniko_pod_name, namespace=namespace)
-                            v1.delete_namespaced_config_map(name=f"build-context-{build_id}", namespace=namespace)
+                            v1.delete_namespaced_config_map(
+                                name=f"build-context-{build_id}", namespace=namespace
+                            )
                         except:
                             pass
                         return True
                     elif phase == "Failed":
                         # Get logs
                         try:
-                            logs = v1.read_namespaced_pod_log(name=kaniko_pod_name, namespace=namespace)
+                            logs = v1.read_namespaced_pod_log(
+                                name=kaniko_pod_name, namespace=namespace
+                            )
                             print(f"❌ Build failed! Logs:\n{logs}")
                         except:
                             print(f"❌ Build failed but couldn't retrieve logs")
@@ -752,6 +865,7 @@ async def root():
         except Exception as e:
             print(f"❌ Build error: {e}")
             import traceback
+
             traceback.print_exc()
             return False
 
@@ -766,16 +880,16 @@ async def root():
         """Deploy to Kubernetes and return external IP."""
         try:
             from kubernetes import client, config
-            
+
             # Load in-cluster config
             try:
                 config.load_incluster_config()
             except:
                 config.load_kube_config()
-            
+
             apps_v1 = client.AppsV1Api()
             core_v1 = client.CoreV1Api()
-            
+
             deployment_name = f"{model_name.replace('_', '-')}-inference"
             service_name = f"{model_name.replace('_', '-')}-service"
 
@@ -786,9 +900,7 @@ async def root():
                 metadata=client.V1ObjectMeta(name=deployment_name, namespace=namespace),
                 spec=client.V1DeploymentSpec(
                     replicas=replicas,
-                    selector=client.V1LabelSelector(
-                        match_labels={"app": deployment_name}
-                    ),
+                    selector=client.V1LabelSelector(match_labels={"app": deployment_name}),
                     template=client.V1PodTemplateSpec(
                         metadata=client.V1ObjectMeta(labels={"app": deployment_name}),
                         spec=client.V1PodSpec(
@@ -800,23 +912,23 @@ async def root():
                                     ports=[client.V1ContainerPort(container_port=80)],
                                     resources=client.V1ResourceRequirements(
                                         requests={"memory": "512Mi", "cpu": "250m"},
-                                        limits={"memory": "1Gi", "cpu": "1000m"}
+                                        limits={"memory": "1Gi", "cpu": "1000m"},
                                     ),
                                     liveness_probe=client.V1Probe(
                                         http_get=client.V1HTTPGetAction(path="/health", port=80),
                                         initial_delay_seconds=60,
-                                        period_seconds=10
+                                        period_seconds=10,
                                     ),
                                     readiness_probe=client.V1Probe(
                                         http_get=client.V1HTTPGetAction(path="/health", port=80),
                                         initial_delay_seconds=30,
-                                        period_seconds=5
-                                    )
+                                        period_seconds=5,
+                                    ),
                                 )
-                            ]
-                        )
-                    )
-                )
+                            ],
+                        ),
+                    ),
+                ),
             )
 
             try:
@@ -828,14 +940,14 @@ async def root():
 
             # Create LoadBalancer service
             print(f"🌐 Creating LoadBalancer service: {service_name}")
-            
+
             service = client.V1Service(
                 metadata=client.V1ObjectMeta(name=service_name, namespace=namespace),
                 spec=client.V1ServiceSpec(
                     type="LoadBalancer",
                     selector={"app": deployment_name},
-                    ports=[client.V1ServicePort(port=80, target_port=80, protocol="TCP")]
-                )
+                    ports=[client.V1ServicePort(port=80, target_port=80, protocol="TCP")],
+                ),
             )
 
             try:
@@ -849,16 +961,18 @@ async def root():
             print(f"⏳ Waiting for external IP assignment...")
             for i in range(36):
                 time.sleep(5)
-                
+
                 try:
-                    svc_status = core_v1.read_namespaced_service(name=service_name, namespace=namespace)
-                    
+                    svc_status = core_v1.read_namespaced_service(
+                        name=service_name, namespace=namespace
+                    )
+
                     if svc_status.status.load_balancer.ingress:
                         external_ip = svc_status.status.load_balancer.ingress[0].ip
                         if external_ip:
                             print(f"✅ External IP assigned: {external_ip}")
                             return external_ip
-                    
+
                     print(f"⏳ Waiting for IP... ({i*5}s elapsed)")
                 except Exception as ip_error:
                     print(f"⚠️  Error checking service status: {ip_error}")
@@ -870,7 +984,6 @@ async def root():
         except Exception as e:
             print(f"❌ Deploy error: {e}")
             import traceback
+
             traceback.print_exc()
             return None
-
-

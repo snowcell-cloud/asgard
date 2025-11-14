@@ -187,24 +187,29 @@ class DeployModelRequest(BaseModel):
 
 
 class DeployModelResponse(BaseModel):
-    """Response from complete model deployment."""
+    """Response from deployment submission (async)."""
 
-    model_name: str = Field(..., description="Deployed model name")
-    experiment_name: str = Field(..., description="MLflow experiment name")
-    status: str = Field(..., description="Deployment status: deployed or failed")
-    inference_url: str = Field(..., description="Model inference URL - use this for predictions!")
-    external_ip: str = Field(..., description="LoadBalancer external IP")
-    model_version: str = Field(..., description="Deployed model version")
-    run_id: str = Field(..., description="MLflow run ID")
-    ecr_image: str = Field(..., description="ECR image URI")
-    endpoints: Dict[str, str] = Field(
-        ...,
-        description="Available endpoints on the deployed model",
-        example={
-            "health": "http://IP/health",
-            "metadata": "http://IP/metadata",
-            "predict": "http://IP/predict",
-        },
-    )
-    deployment_time_seconds: float = Field(..., description="Total deployment time")
-    message: str = Field(..., description="Success message")
+    deployment_id: str = Field(..., description="Unique deployment identifier")
+    model_name: str = Field(..., description="Model name being deployed")
+    status: str = Field(..., description="Deployment status: submitted")
+    message: str = Field(..., description="Instructions to check deployment status")
+
+
+class DeploymentStatusResponse(BaseModel):
+    """Response for deployment status query."""
+
+    deployment_id: str = Field(..., description="Unique deployment identifier")
+    model_name: str = Field(..., description="Model name")
+    experiment_name: str = Field(..., description="Experiment name")
+    status: str = Field(..., description="Status: submitted, running, deployed, failed")
+    progress: str = Field(..., description="Current progress description")
+    submitted_at: datetime = Field(..., description="Submission timestamp")
+    started_at: Optional[datetime] = Field(None, description="Start timestamp")
+    completed_at: Optional[datetime] = Field(None, description="Completion timestamp")
+    inference_url: Optional[str] = Field(None, description="Inference URL (when deployed)")
+    external_ip: Optional[str] = Field(None, description="External IP (when deployed)")
+    run_id: Optional[str] = Field(None, description="MLflow run ID")
+    model_version: Optional[str] = Field(None, description="Model version")
+    ecr_image: Optional[str] = Field(None, description="ECR image URI")
+    endpoints: Optional[Dict[str, str]] = Field(None, description="Service endpoints")
+    error: Optional[str] = Field(None, description="Error message (if failed)")
