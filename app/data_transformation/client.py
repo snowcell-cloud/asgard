@@ -235,7 +235,7 @@ class SparkApplicationFactory:
                     "spark.sql.adaptive.enabled": "true",
                     "spark.sql.adaptive.coalescePartitions.enabled": "true",
                     "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-                    "spark.hadoop.fs.s3a.access.key":  os.getenv("AWS_ACCESS_KEY_ID"),
+                    "spark.hadoop.fs.s3a.access.key": os.getenv("AWS_ACCESS_KEY_ID"),
                     "spark.hadoop.fs.s3a.secret.key": os.getenv("AWS_SECRET_ACCESS_KEY"),
                     "spark.hadoop.fs.s3a.endpoint.region": "eu-north-1",
                     "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
@@ -254,6 +254,7 @@ class SparkApplicationFactory:
                 "volumes": [],
             },
         }
+
 
 def get_spark_client() -> SparkApplicationClient:
     """Dependency function to get SparkApplicationClient."""

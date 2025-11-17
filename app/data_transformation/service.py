@@ -122,6 +122,7 @@ class TransformationService:
             name=name,
             namespace=self.spark_client.namespace,
             sql=req.sql,
+            source_path=req.source_path,
             sources=sources,
             destination=destination,
             write_mode=req.write_mode,

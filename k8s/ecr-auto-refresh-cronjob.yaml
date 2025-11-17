@@ -1,0 +1,117 @@
+---
+# Simplified CronJob for ECR secret refresh
+# Runs every 11 hours to keep ECR credentials fresh (ECR tokens expire after 12 hours)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ecr-secret-auto-refresh
+  namespace: asgard
+  labels:
+    app: ecr-credentials
+    component: cronjob
+spec:
+  schedule: "0 */11 * * *" # Every 11 hours at :00 minutes
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Replace
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: ecr-credentials
+            component: refresh-job
+        spec:
+          serviceAccountName: ecr-secret-updater
+          restartPolicy: OnFailure
+          containers:
+            - name: refresh-ecr-secret
+              image: amazon/aws-cli:latest
+              envFrom:
+                - configMapRef:
+                    name: ecr-config
+                - secretRef:
+                    name: aws-credentials
+              env:
+                - name: NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+              command: ["/bin/bash", "/scripts/refresh-ecr-secret.sh"]
+          volumes:
+            - name: script
+              configMap:
+                name: ecr-refresh-script
+                defaultMode: 0755
+
+---
+# ConfigMap containing the refresh script
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ecr-refresh-script
+  namespace: asgard
+  labels:
+    app: ecr-credentials
+data:
+  refresh-ecr-secret.sh: |
+    #!/bin/bash
+    set -e
+
+    ECR_REGISTRY="${ECR_REGISTRY:-637423187518.dkr.ecr.eu-north-1.amazonaws.com}"
+    AWS_REGION="${AWS_REGION:-eu-north-1}"
+    NAMESPACE="${NAMESPACE:-asgard}"
+
+    echo "==========================================="
+    echo "ECR Secret Refresh - CronJob"
+    echo "Time: $(date)"
+    echo "Registry: ${ECR_REGISTRY}"
+    echo "Namespace: ${NAMESPACE}"
+    echo "==========================================="
+
+    # Install kubectl
+    echo "📦 Installing kubectl..."
+    curl -sLO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    chmod +x kubectl
+    mv kubectl /usr/local/bin/
+
+    # Get ECR credentials
+    echo "🔐 Getting ECR credentials..."
+    ECR_PASSWORD=$(aws ecr get-login-password --region ${AWS_REGION})
+
+    if [ -z "$ECR_PASSWORD" ]; then
+      echo "❌ Failed to get ECR password"
+      exit 1
+    fi
+
+    echo "✅ ECR password obtained"
+
+    # Create secret YAML
+    echo "🔧 Creating/updating secret..."
+    cat <<EOF | kubectl apply -f -
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: ecr-secret
+      namespace: ${NAMESPACE}
+      labels:
+        app: ecr-credentials
+        managed-by: cronjob
+      annotations:
+        last-updated: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    type: kubernetes.io/dockerconfigjson
+    data:
+      .dockerconfigjson: $(echo -n "{\"auths\":{\"${ECR_REGISTRY}\":{\"username\":\"AWS\",\"password\":\"${ECR_PASSWORD}\"}}}" | base64 -w 0)
+    EOF
+
+    echo ""
+    echo "✅ Secret updated successfully!"
+    echo "🔍 Verifying..."
+    kubectl get secret ecr-secret -n ${NAMESPACE} -o custom-columns=NAME:.metadata.name,TYPE:.type,LAST-UPDATED:.metadata.annotations.last-updated
+
+    echo "==========================================="
+    echo "✅ Refresh completed!"
