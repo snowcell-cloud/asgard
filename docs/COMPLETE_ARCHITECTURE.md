@@ -378,7 +378,7 @@ app/
 
 **Purpose**: Data ingestion from external sources to Bronze layer
 
-````mermaid
+```mermaid
 flowchart TB
     subgraph External["External Data Sources"]
         Source1["PostgreSQL\ncustomers table"]
@@ -440,7 +440,7 @@ Source DB → Airbyte Connector → Normalization → S3/Iceberg (Bronze)
 
 **Purpose**: Distributed data processing (Bronze → Silver)
 
-```mermaid
+````mermaid
 flowchart TB
     subgraph API["API Request"]
         Request["POST /spark/transform\njob_name, sql_query, output_table"]
