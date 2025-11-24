@@ -328,6 +328,7 @@ flowchart LR
 **Architecture**:
 
 ```
+
 app/
 ├── __init__.py
 ├── main.py               # FastAPI application
@@ -425,6 +426,7 @@ flowchart TB
 **Data Flow**:
 
 ```
+
 Source DB → Airbyte Connector → Normalization → S3/Iceberg (Bronze)
 ```
 
@@ -739,6 +741,7 @@ flowchart LR
 ### S3 Storage Structure
 
 ```
+
 s3://airbytedestination1/iceberg/
 
 ├── bronze/                          # Raw data from sources
@@ -917,12 +920,14 @@ LIMIT 1
 **Result**:
 
 ```
+
 s3://airbytedestination1/iceberg/gold/efxgs5oersyezxnzydx4vsyou04jna6ti5/data/20251007_082213_00049_yb5wr-4e34e6e9.parquet
 ```
 
 **Extracted Path**:
 
 ```
+
 s3://airbytedestination1/iceberg/gold/efxgs5oersyezxnzydx4vsyou04jna6ti5/data/*.parquet
 ```
 
@@ -1249,6 +1254,7 @@ flowchart TB
 ### Service Communication
 
 ```
+
 asgard-app Pod Communication:
 ├── http://mlflow-service:5000           (MLflow API)
 ├── http://trino:8080                    (Trino queries)
