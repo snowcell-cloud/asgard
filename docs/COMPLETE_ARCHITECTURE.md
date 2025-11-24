@@ -29,48 +29,56 @@
 
 Asgard is a **unified data lakehouse platform** built on Kubernetes that orchestrates the complete data lifecycle from ingestion to ML deployment through a single FastAPI gateway.
 
-```mermaid
+````mermaid
 graph TB
-    subgraph "External Systems"
+    subgraph External["External Systems"]
         DB1[PostgreSQL]
         DB2[MySQL]
         API1[REST APIs]
     end
 
-    subgraph "Asgard Platform - Kubernetes Cluster"
-        subgraph "API Layer"
-            Gateway[FastAPI Gateway<br/>Port 80]
+    subgraph Platform["Asgard Platform - Kubernetes Cluster"]
+        subgraph APILayer["API Layer"]
+            Gateway["FastAPI Gateway\nPort 80"]
         end
 
-        subgraph "Processing Components"
-            Airbyte[Airbyte<br/>Data Ingestion]
-            Spark[Spark on K8s<br/>Data Processing]
-            DBT[DBT + Trino<br/>SQL Transformations]
-            Feast[Feast<br/>Feature Store]
-            MLflow[MLflow<br/>ML Platform]
+        subgraph Processing["Processing Components"]
+            Airbyte["Airbyte\nData Ingestion"]
+            Spark["Spark on K8s\nData Processing"]
+            DBT["DBT + Trino\nSQL Transformations"]
+            Feast["Feast\nFeature Store"]
+            MLflow["MLflow\nML Platform"]
         end
 
-        subgraph "Data Lakehouse"
-            Bronze[Bronze Layer<br/>Raw Data]
-            Silver[Silver Layer<br/>Cleaned Data]
-            Gold[Gold Layer<br/>Aggregated Metrics]
+        subgraph Lakehouse["Data Lakehouse"]
+            Bronze["Bronze Layer\nRaw Data"]
+            Silver["Silver Layer\nCleaned Data"]
+            Gold["Gold Layer\nAggregated Metrics"]
         end
 
-        subgraph "Storage & Metadata"
-            S3[(S3 Object Storage<br/>Iceberg + Parquet)]
-            Postgres[(PostgreSQL<br/>Metadata)]
-            Nessie[Nessie Catalog<br/>Data Versioning]
+        subgraph StorageMeta["Storage & Metadata"]
+            S3["S3 Object Storage\nIceberg + Parquet"]
+            Postgres["PostgreSQL\nMetadata"]
+            Nessie["Nessie Catalog\nData Versioning"]
         end
     end
 
-    DB1 & DB2 & API1 --> Gateway
-    Gateway --> Airbyte & Spark & DBT & Feast & MLflow
+    DB1 --> Gateway
+    DB2 --> Gateway
+    API1 --> Gateway
+    Gateway --> Airbyte
+    Gateway --> Spark
+    Gateway --> DBT
+    Gateway --> Feast
+    Gateway --> MLflow
 
     Airbyte --> Bronze
     Spark --> Silver
     DBT --> Gold
 
-    Bronze & Silver & Gold --> S3
+    Bronze --> S3
+    Silver --> S3
+    Gold --> S3
     S3 <--> Nessie
 
     Feast -.Direct Read.-> Gold
@@ -86,9 +94,7 @@ graph TB
     class Airbyte,Spark,DBT,Feast,MLflow process
     class Bronze,Silver,Gold data
     class S3,Postgres,Nessie storage
-```
-
-### Key Architectural Principles
+```### Key Architectural Principles
 
 1. **API-First Design** - All operations accessible via REST API
 2. **Medallion Architecture** - Bronze → Silver → Gold data layers
@@ -118,7 +124,8 @@ graph TB
 | **Orchestration**   | Kubernetes     | 1.27+       | Container orchestration        |
 | **Spark Operator**  | Spark on K8s   | 3.5.0       | Spark job management           |
 
-### Language & Frameworks
+### Language |
+    || Frameworks
 
 | Technology  | Version | Usage                               |
 | ----------- | ------- | ----------------------------------- |
@@ -137,19 +144,17 @@ graph TB
 ```mermaid
 flowchart TB
     subgraph Client["Client Layer"]
-        User[Data Engineer/ML Engineer]
-        API_Docs[Swagger UI<br/>localhost:8000/docs]
+        User["Data Engineer / ML Engineer"]
+        API_Docs["Swagger UI\nlocalhost:8000/docs"]
     end
 
     subgraph API["API Layer - FastAPI Gateway"]
-        Router_Airbyte[/datasource<br/>/datasink<br/>/ingestion]
-        Router_Spark[/spark/transform]
-        Router_DBT[/dbt/transform]
-        Router_Feast[/feast/features<br/>/feast/status]
-        Router_MLOps[/mlops/training<br/>/mlops/inference]
-    end
-
-    subgraph Platform["Platform Components"]
+        Router_Airbyte["/datasource\n/datasink\n/ingestion"]
+        Router_Spark["/spark/transform"]
+        Router_DBT["/dbt/transform"]
+        Router_Feast["/feast/features\n/feast/status"]
+        Router_MLOps["/mlops/training\n/mlops/inference"]
+    end    subgraph Platform["Platform Components"]
         direction TB
 
         subgraph Airbyte_System["Airbyte Platform"]
@@ -171,8 +176,8 @@ flowchart TB
         end
 
         subgraph Feast_System["Feast Feature Store"]
-            Feast_Registry[(Feature Registry<br/>PostgreSQL)]
-            Feast_OfflineStore[Offline Store<br/>File-based]
+            Feast_Registry["Feature Registry\nPostgreSQL"]
+            Feast_OfflineStore["Offline Store\nFile-based"]
         end
 
         subgraph MLflow_System["MLflow Platform"]
@@ -184,22 +189,25 @@ flowchart TB
 
     subgraph Lakehouse["Data Lakehouse - Medallion Architecture"]
         direction LR
-        Bronze[Bronze Layer<br/>Raw Data<br/>Parquet]
-        Silver[Silver Layer<br/>Cleaned Data<br/>Parquet]
-        Gold[Gold Layer<br/>ML-Ready Features<br/>Parquet]
+        Bronze["Bronze Layer\nRaw Data\nParquet"]
+        Silver["Silver Layer\nCleaned Data\nParquet"]
+        Gold["Gold Layer\nML-Ready Features\nParquet"]
 
-        Bronze -->|Spark SQL<br/>Cleansing| Silver
-        Silver -->|DBT + Trino<br/>Aggregation| Gold
+        Bronze -->|"Spark SQL\nCleansing"| Silver
+        Silver -->|"DBT + Trino\nAggregation"| Gold
     end
 
-    subgraph Storage["Storage & Catalog"]
-        S3[(S3 Object Storage<br/>s3://airbytedestination1)]
-        Nessie[Nessie Catalog<br/>Git-like Versioning]
-        Postgres[(PostgreSQL<br/>Metadata Store)]
-    end
-
-    User --> API_Docs
-    API_Docs --> Router_Airbyte & Router_Spark & Router_DBT & Router_Feast & Router_MLOps
+    subgraph Storage["Storage |
+    || Catalog"]
+        S3["S3 Object Storage\ns3://airbytedestination1"]
+        Nessie["Nessie Catalog\nGit-like Versioning"]
+        Postgres["PostgreSQL\nMetadata Store"]
+    end    User --> API_Docs
+    API_Docs --> Router_Airbyte
+    API_Docs --> Router_Spark
+    API_Docs --> Router_DBT
+    API_Docs --> Router_Feast
+    API_Docs --> Router_MLOps
 
     Router_Airbyte --> Airbyte_Server
     Router_Spark --> Spark_Operator
@@ -207,22 +215,26 @@ flowchart TB
     Router_Feast --> Feast_Registry
     Router_MLOps --> MLflow_Tracking
 
-    Airbyte_Server --> Airbyte_Worker & Airbyte_Temporal
+    Airbyte_Server --> Airbyte_Worker
+    Airbyte_Server --> Airbyte_Temporal
     Spark_Operator --> Spark_Driver --> Spark_Executors
     DBT_Service --> Trino_Coordinator --> Trino_Workers
 
-    Airbyte_Worker -->|Write| Bronze
-    Spark_Executors -->|Read/Write| Bronze & Silver
-    Trino_Workers -->|Read/Write| Silver & Gold
+    Airbyte_Worker -->|"Write"| Bronze
+    Spark_Executors -->|"Read/Write"| Bronze
+    Spark_Executors -->|"Read/Write"| Silver
+    Trino_Workers -->|"Read/Write"| Silver
+    Trino_Workers -->|"Read/Write"| Gold
 
-    Bronze & Silver & Gold --> S3
-    S3 <-->|Metadata| Nessie
+    Bronze --> S3
+    Silver --> S3
+    Gold --> S3
+    S3 <-->|"Metadata"| Nessie
 
-    Feast_OfflineStore -.Direct S3 Read<br/>NO COPY!.-> Gold
-    Feast_Registry & MLflow_Tracking --> Postgres
-    MLflow_Tracking -->|Artifacts| S3
-
-    classDef clientStyle fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    Feast_OfflineStore -."Direct S3 Read\nNO COPY!".-> Gold
+    Feast_Registry --> Postgres
+    MLflow_Tracking --> Postgres
+    MLflow_Tracking -->|"Artifacts"| S3    classDef clientStyle fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
     classDef apiStyle fill:#fff3e0,stroke:#f57c00,stroke-width:2px
     classDef processStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
     classDef dataStyle fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
@@ -233,7 +245,7 @@ flowchart TB
     class Airbyte_System,Spark_System,DBT_System,Feast_System,MLflow_System processStyle
     class Bronze,Silver,Gold dataStyle
     class S3,Nessie,Postgres storageStyle
-```
+````
 
 ### Data Flow - End-to-End Pipeline
 
@@ -246,42 +258,42 @@ flowchart LR
     end
 
     subgraph Phase1["Phase 1: Ingestion"]
-        Airbyte_Sync[Airbyte Sync Job]
-        Bronze_Store[(Bronze Layer<br/>100K rows<br/>Raw as-is)]
+        Airbyte_Sync["Airbyte Sync Job"]
+        Bronze_Store["Bronze Layer\n100K rows\nRaw as-is"]
     end
 
     subgraph Phase2["Phase 2: Cleansing"]
-        Spark_Clean[Spark SQL<br/>- Deduplication<br/>- Type Casting<br/>- Null Handling]
-        Silver_Store[(Silver Layer<br/>98.5K rows<br/>Cleaned)]
+        Spark_Clean["Spark SQL\n- Deduplication\n- Type Casting\n- Null Handling"]
+        Silver_Store["Silver Layer\n98.5K rows\nCleaned"]
     end
 
     subgraph Phase3["Phase 3: Aggregation"]
-        DBT_Agg[DBT + Trino<br/>- Joins<br/>- Aggregations<br/>- Feature Engineering]
-        Gold_Store[(Gold Layer<br/>ML-Ready Features)]
+        DBT_Agg["DBT + Trino\n- Joins\n- Aggregations\n- Feature Engineering"]
+        Gold_Store["Gold Layer\nML-Ready Features"]
     end
 
     subgraph Phase4["Phase 4: Feature Store"]
-        Feast_Register[Feast Registration<br/>Direct S3 Path]
-        Feature_Views[Feature Views<br/>Time-Travel Queries]
+        Feast_Register["Feast Registration\nDirect S3 Path"]
+        Feature_Views["Feature Views\nTime-Travel Queries"]
     end
 
     subgraph Phase5["Phase 5: ML Training"]
-        MLflow_Train[MLflow Training<br/>- Fetch Features<br/>- Train Model<br/>- Log Metrics]
-        Model_Registry[(Model Registry<br/>Versioned Models)]
+        MLflow_Train["MLflow Training\n- Fetch Features\n- Train Model\n- Log Metrics"]
+        Model_Registry["Model Registry\nVersioned Models"]
     end
 
     subgraph Phase6["Phase 6: Inference"]
-        Inference_API[Inference Service<br/>Predictions]
-        Applications[ML Applications]
-    end
-
-    PG & MySQL & APIs --> Airbyte_Sync
-    Airbyte_Sync -->|Write Parquet| Bronze_Store
+        Inference_API["Inference Service\nPredictions"]
+        Applications["ML Applications"]
+    end    PG --> Airbyte_Sync
+    MySQL --> Airbyte_Sync
+    APIs --> Airbyte_Sync
+    Airbyte_Sync -->|"Write Parquet"| Bronze_Store
     Bronze_Store --> Spark_Clean
-    Spark_Clean -->|Write Parquet| Silver_Store
+    Spark_Clean -->|"Write Parquet"| Silver_Store
     Silver_Store --> DBT_Agg
-    DBT_Agg -->|Write Parquet| Gold_Store
-    Gold_Store -.Direct Read.-> Feast_Register
+    DBT_Agg -->|"Write Parquet"| Gold_Store
+    Gold_Store -."Direct Read".-> Feast_Register
     Feast_Register --> Feature_Views
     Feature_Views --> MLflow_Train
     MLflow_Train --> Model_Registry
@@ -360,26 +372,26 @@ app/
 
 **Purpose**: Data ingestion from external sources to Bronze layer
 
-```mermaid
+````mermaid
 flowchart TB
     subgraph External["External Data Sources"]
-        Source1[PostgreSQL<br/>customers table]
-        Source2[MySQL<br/>transactions table]
-        Source3[REST API<br/>support tickets]
+        Source1["PostgreSQL\ncustomers table"]
+        Source2["MySQL\ntransactions table"]
+        Source3["REST API\nsupport tickets"]
     end
 
     subgraph Airbyte["Airbyte Platform"]
-        Server[Airbyte Server<br/>:8001]
-        Temporal[Temporal<br/>Workflow Engine]
-        Worker1[Worker Pod 1]
-        Worker2[Worker Pod 2]
-        Database[(PostgreSQL<br/>Airbyte Config)]
+        Server["Airbyte Server\n:8001"]
+        Temporal["Temporal\nWorkflow Engine"]
+        Worker1["Worker Pod 1"]
+        Worker2["Worker Pod 2"]
+        Database["PostgreSQL\nAirbyte Config"]
     end
 
     subgraph Bronze["Bronze Layer"]
-        Table1[iceberg.bronze.customers<br/>Parquet]
-        Table2[iceberg.bronze.transactions<br/>Parquet]
-        Table3[iceberg.bronze.support_tickets<br/>Parquet]
+        Table1["iceberg.bronze.customers\nParquet"]
+        Table2["iceberg.bronze.transactions\nParquet"]
+        Table3["iceberg.bronze.support_tickets\nParquet"]
     end
 
     Source1 --> Worker1
@@ -387,10 +399,12 @@ flowchart TB
     Source3 --> Worker2
 
     Server --> Temporal
-    Temporal --> Worker1 & Worker2
+    Temporal --> Worker1
+    Temporal --> Worker2
     Server <--> Database
 
-    Worker1 --> Table1 & Table2
+    Worker1 --> Table1
+    Worker1 --> Table2
     Worker2 --> Table3
 
     classDef sourceStyle fill:#e3f2fd,stroke:#1565c0
@@ -400,13 +414,13 @@ flowchart TB
     class Source1,Source2,Source3 sourceStyle
     class Server,Temporal,Worker1,Worker2,Database airbyteStyle
     class Table1,Table2,Table3 dataStyle
-```
+```**Data Flow**:
 
-**Data Flow**:
+````
 
-```
 Source DB → Airbyte Connector → Normalization → S3/Iceberg (Bronze)
-```
+
+````
 
 **Supported Sources**:
 
@@ -423,38 +437,46 @@ Source DB → Airbyte Connector → Normalization → S3/Iceberg (Bronze)
 ```mermaid
 flowchart TB
     subgraph API["API Request"]
-        Request[POST /spark/transform<br/>job_name, sql_query, output_table]
+        Request["POST /spark/transform\njob_name, sql_query, output_table"]
     end
 
     subgraph Operator["Spark Operator"]
-        CustomResource[SparkApplication<br/>Custom Resource]
-        Controller[Operator Controller]
+        CustomResource["SparkApplication\nCustom Resource"]
+        Controller["Operator Controller"]
     end
 
     subgraph SparkCluster["Spark Cluster"]
-        Driver[Driver Pod<br/>- Job Coordinator<br/>- Spark SQL<br/>- UI :4040]
+        Driver["Driver Pod\n- Job Coordinator\n- Spark SQL\n- UI :4040"]
 
         subgraph Executors["Executor Pods"]
-            Exec1[Executor 1<br/>2 cores, 4GB]
-            Exec2[Executor 2<br/>2 cores, 4GB]
-            Exec3[Executor 3<br/>2 cores, 4GB]
+            Exec1["Executor 1\n2 cores, 4GB"]
+            Exec2["Executor 2\n2 cores, 4GB"]
+            Exec3["Executor 3\n2 cores, 4GB"]
         end
     end
 
     subgraph Data["Data Lakehouse"]
-        Bronze[(Bronze Layer<br/>Read)]
-        Silver[(Silver Layer<br/>Write)]
+        Bronze["Bronze Layer\nRead"]
+        Silver["Silver Layer\nWrite"]
     end
 
     Request --> CustomResource
     CustomResource --> Controller
-    Controller -->|Create| Driver
-    Driver -->|Request Executors| Controller
-    Controller -->|Create| Exec1 & Exec2 & Exec3
+    Controller -->|"Create"| Driver
+    Driver -->|"Request Executors"| Controller
+    Controller -->|"Create"| Exec1
+    Controller -->|"Create"| Exec2
+    Controller -->|"Create"| Exec3
 
-    Driver <-->|Tasks| Exec1 & Exec2 & Exec3
-    Exec1 & Exec2 & Exec3 -->|Read| Bronze
-    Exec1 & Exec2 & Exec3 -->|Write| Silver
+    Driver <-->|"Tasks"| Exec1
+    Driver <-->|"Tasks"| Exec2
+    Driver <-->|"Tasks"| Exec3
+    Exec1 -->|"Read"| Bronze
+    Exec2 -->|"Read"| Bronze
+    Exec3 -->|"Read"| Bronze
+    Exec1 -->|"Write"| Silver
+    Exec2 -->|"Write"| Silver
+    Exec3 -->|"Write"| Silver
 
     classDef apiStyle fill:#fff3e0,stroke:#f57c00
     classDef operatorStyle fill:#e1f5fe,stroke:#0277bd
@@ -465,9 +487,7 @@ flowchart TB
     class CustomResource,Controller operatorStyle
     class Driver,Exec1,Exec2,Exec3 sparkStyle
     class Bronze,Silver dataStyle
-```
-
-**Key Capabilities**:
+```**Key Capabilities**:
 
 - **SQL-based transformations** via Spark SQL
 - **Iceberg integration** for reading/writing tables
@@ -482,37 +502,41 @@ flowchart TB
 ```mermaid
 flowchart LR
     subgraph API["API Layer"]
-        Request[POST /dbt/transform<br/>model_name, dependencies]
+        Request["POST /dbt/transform\nmodel_name, dependencies"]
     end
 
     subgraph DBT["DBT Service"]
-        Service[DBT Service]
-        Models[SQL Models<br/>- customer_metrics.sql<br/>- product_analytics.sql]
+        Service["DBT Service"]
+        Models["SQL Models\n- customer_metrics.sql\n- product_analytics.sql"]
     end
 
     subgraph Trino["Trino Cluster"]
-        Coordinator[Trino Coordinator<br/>Query Planning]
-        Worker1[Worker 1<br/>Query Execution]
-        Worker2[Worker 2<br/>Query Execution]
+        Coordinator["Trino Coordinator\nQuery Planning"]
+        Worker1["Worker 1\nQuery Execution"]
+        Worker2["Worker 2\nQuery Execution"]
     end
 
     subgraph Iceberg["Iceberg Tables"]
-        Silver[(Silver Layer<br/>customers_cleaned<br/>transactions_cleaned)]
-        Gold[(Gold Layer<br/>customer_metrics<br/>product_analytics)]
+        Silver["Silver Layer\ncustomers_cleaned\ntransactions_cleaned"]
+        Gold["Gold Layer\ncustomer_metrics\nproduct_analytics"]
     end
 
     subgraph Catalog["Nessie Catalog"]
-        Nessie[Nessie Server<br/>Table Metadata<br/>Version Control]
+        Nessie["Nessie Server\nTable Metadata\nVersion Control"]
     end
 
     Request --> Service
     Service --> Models
-    Models -->|Generate SQL| Coordinator
-    Coordinator --> Worker1 & Worker2
-    Worker1 & Worker2 -->|Read| Silver
-    Worker1 & Worker2 -->|Write| Gold
+    Models -->|"Generate SQL"| Coordinator
+    Coordinator --> Worker1
+    Coordinator --> Worker2
+    Worker1 -->|"Read"| Silver
+    Worker2 -->|"Read"| Silver
+    Worker1 -->|"Write"| Gold
+    Worker2 -->|"Write"| Gold
 
-    Silver & Gold <-->|Metadata| Nessie
+    Silver <-->|"Metadata"| Nessie
+    Gold <-->|"Metadata"| Nessie
 
     classDef apiStyle fill:#fff3e0,stroke:#f57c00
     classDef dbtStyle fill:#e8f5e9,stroke:#2e7d32
@@ -525,9 +549,7 @@ flowchart LR
     class Coordinator,Worker1,Worker2 trinoStyle
     class Silver,Gold dataStyle
     class Nessie catalogStyle
-```
-
-**Key Features**:
+```**Key Features**:
 
 - **SQL-first** approach for data transformations
 - **Incremental models** for efficient processing
@@ -542,41 +564,42 @@ flowchart LR
 ```mermaid
 flowchart TB
     subgraph API["API Layer"]
-        Register[POST /feast/features<br/>Register from Iceberg]
-        Retrieve[GET /feast/features<br/>Historical Retrieval]
+        Register["POST /feast/features\nRegister from Iceberg"]
+        Retrieve["GET /feast/features\nHistorical Retrieval"]
     end
 
     subgraph Feast["Feast Feature Store"]
-        Service[Feast Service]
-        Registry[(Feature Registry<br/>PostgreSQL)]
-        OfflineStore[Offline Store<br/>File-based]
+        Service["Feast Service"]
+        Registry["Feature Registry\nPostgreSQL"]
+        OfflineStore["Offline Store\nFile-based"]
     end
 
     subgraph Iceberg["Iceberg Gold Layer"]
-        Gold[(S3 Parquet Files<br/>s3://.../gold/*/data/*.parquet)]
-        Metadata[Iceberg Metadata<br/>Schema, Snapshots]
+        Gold["S3 Parquet Files\ns3://.../gold/*/data/*.parquet"]
+        Metadata["Iceberg Metadata\nSchema, Snapshots"]
     end
 
     subgraph Trino["Trino"]
-        TrinoQuery[Trino Query Engine<br/>Extract S3 Path]
+        TrinoQuery["Trino Query Engine\nExtract S3 Path"]
     end
 
     subgraph ML["ML Applications"]
-        Training[Training Scripts]
-        Inference[Inference Services]
+        Training["Training Scripts"]
+        Inference["Inference Services"]
     end
 
     Register --> Service
-    Service -->|Query for Path| TrinoQuery
-    TrinoQuery -->|$path column| Metadata
-    Metadata -->|S3 Parquet Path| Service
-    Service -->|FileSource config| Registry
+    Service -->|"Query for Path"| TrinoQuery
+    TrinoQuery -->|"$path column"| Metadata
+    Metadata -->|"S3 Parquet Path"| Service
+    Service -->|"FileSource config"| Registry
 
     Retrieve --> Service
     Service --> OfflineStore
-    OfflineStore -.Direct S3 Read<br/>NO COPY!.-> Gold
+    OfflineStore -."Direct S3 Read\nNO COPY!".-> Gold
 
-    OfflineStore -->|Features| Training & Inference
+    OfflineStore -->|"Features"| Training
+    OfflineStore -->|"Features"| Inference
 
     classDef apiStyle fill:#fff3e0,stroke:#f57c00
     classDef feastStyle fill:#e8f5e9,stroke:#2e7d32
@@ -589,9 +612,7 @@ flowchart TB
     class Gold,Metadata dataStyle
     class TrinoQuery trinoStyle
     class Training,Inference mlStyle
-```
-
-**Unique Design**: Direct S3 Parquet reads from Iceberg Gold layer
+```**Unique Design**: Direct S3 Parquet reads from Iceberg Gold layer
 
 ### 6. MLflow Platform
 
@@ -600,37 +621,37 @@ flowchart TB
 ```mermaid
 flowchart TB
     subgraph API["API Layer"]
-        Upload[POST /mlops/training/upload<br/>Training Script]
-        Deploy[POST /mlops/inference<br/>Prediction Request]
+        Upload["POST /mlops/training/upload\nTraining Script"]
+        Deploy["POST /mlops/inference\nPrediction Request"]
     end
 
     subgraph MLflow["MLflow Platform"]
-        Tracking[Tracking Server<br/>:5000]
-        Registry[Model Registry]
+        Tracking["Tracking Server\n:5000"]
+        Registry["Model Registry"]
 
         subgraph Backend["Storage Backend"]
-            MetaDB[(PostgreSQL<br/>Runs, Metrics, Params)]
-            ArtifactS3[(S3<br/>Models, Plots, Logs)]
+            MetaDB["PostgreSQL\nRuns, Metrics, Params"]
+            ArtifactS3["S3\nModels, Plots, Logs"]
         end
     end
 
     subgraph Execution["Training Execution"]
-        TrainingPod[Training Job Pod<br/>- Install deps<br/>- Fetch features<br/>- Train model]
+        TrainingPod["Training Job Pod\n- Install deps\n- Fetch features\n- Train model"]
     end
 
     subgraph Inference["Model Serving"]
-        InferencePod[Inference Service<br/>- Load model<br/>- Make predictions]
+        InferencePod["Inference Service\n- Load model\n- Make predictions"]
     end
 
     Upload --> Tracking
-    Tracking -->|Create Job| TrainingPod
-    TrainingPod -->|Log Metrics| MetaDB
-    TrainingPod -->|Save Model| ArtifactS3
-    TrainingPod -->|Register| Registry
+    Tracking -->|"Create Job"| TrainingPod
+    TrainingPod -->|"Log Metrics"| MetaDB
+    TrainingPod -->|"Save Model"| ArtifactS3
+    TrainingPod -->|"Register"| Registry
 
     Deploy --> InferencePod
-    InferencePod -->|Load Model| ArtifactS3
-    Registry -->|Version Info| InferencePod
+    InferencePod -->|"Load Model"| ArtifactS3
+    Registry -->|"Version Info"| InferencePod
 
     classDef apiStyle fill:#fff3e0,stroke:#f57c00
     classDef mlflowStyle fill:#e8f5e9,stroke:#2e7d32
@@ -641,16 +662,16 @@ flowchart TB
     class Tracking,Registry mlflowStyle
     class MetaDB,ArtifactS3 storageStyle
     class TrainingPod,InferencePod execStyle
-```
+```**Model Lifecycle**:
 
-**Model Lifecycle**:
+````
 
-```
 Training Script → MLflow Tracking → Model Registry → Model Serving
-        │                 │                 │               │
-        ↓                 ↓                 ↓               ↓
-    Upload         Log metrics      Version model    Inference API
-```
+│ │ │ │
+↓ ↓ ↓ ↓
+Upload Log metrics Version model Inference API
+
+````
 
 ---
 
@@ -689,8 +710,8 @@ flowchart LR
         G1 --> G2 --> G3 --> G4
     end
 
-    Bronze -->|Spark SQL<br/>Cleansing| Silver
-    Silver -->|DBT + Trino<br/>Aggregation| Gold
+    Bronze -->|Spark SQL\nCleansing| Silver
+    Silver -->|DBT + Trino\nAggregation| Gold
 
     classDef bronzeStyle fill:#fbe9e7,stroke:#d84315
     classDef silverStyle fill:#e0f2f1,stroke:#00695c
@@ -699,7 +720,7 @@ flowchart LR
     class Bronze,B1,B2,B3,B4 bronzeStyle
     class Silver,S1,S2,S3,S4 silverStyle
     class Gold,G1,G2,G3,G4 goldStyle
-```
+````
 
 ### S3 Storage Structure
 
@@ -769,22 +790,24 @@ flowchart TB
     end
 
     subgraph Metadata["Iceberg Table Metadata"]
-        Meta1[v1.metadata.json<br/>Schema v1]
-        Meta2[v2.metadata.json<br/>Schema v2]
-        Snap1[snap-123.avro<br/>Snapshot 1]
-        Snap2[snap-456.avro<br/>Snapshot 2]
+        Meta1[v1.metadata.json\nSchema v1]
+        Meta2[v2.metadata.json\nSchema v2]
+        Snap1[snap-123.avro\nSnapshot 1]
+        Snap2[snap-456.avro\nSnapshot 2]
     end
 
     subgraph Data["Data Files in S3"]
-        File1[file1.parquet<br/>100MB]
-        File2[file2.parquet<br/>95MB]
-        File3[file3.parquet<br/>102MB]
+        File1[file1.parquet\n100MB]
+        File2[file2.parquet\n95MB]
+        File3[file3.parquet\n102MB]
     end
 
     Spark & Trino & DBT -->|Catalog API| Nessie
     Nessie -->|Points to| Metadata
     Metadata -->|Manifest List| Snap1 & Snap2
-    Snap1 & Snap2 -->|References| File1 & File2 & File3
+    Snap1 |
+    || Snap2 -->|References| File1 & File2 |
+    || File3
 
     classDef clientStyle fill:#e3f2fd,stroke:#1565c0
     classDef nessieStyle fill:#f3e5f5,stroke:#6a1b9a
@@ -829,7 +852,7 @@ ADD COLUMN loyalty_tier VARCHAR;
 ```mermaid
 flowchart TB
     subgraph Traditional["❌ Traditional Approach - Data Duplication"]
-        I1[Iceberg Gold Layer<br/>S3 Parquet]
+        I1[Iceberg Gold Layer\nS3 Parquet]
         E1[Export/ETL Job]
         L1[Local Parquet Copy]
         F1[Feast Feature Store]
@@ -838,16 +861,16 @@ flowchart TB
         E1 -->|Write| L1
         L1 --> F1
 
-        Problem1[❌ 2x Storage Cost<br/>❌ Sync Overhead<br/>❌ Consistency Issues]
+        Problem1[❌ 2x Storage Cost\n❌ Sync Overhead\n❌ Consistency Issues]
     end
 
     subgraph Asgard["✅ Asgard Approach - Zero Duplication"]
-        I2[Iceberg Gold Layer<br/>S3 Parquet]
-        F2[Feast Feature Store<br/>FileSource]
+        I2[Iceberg Gold Layer\nS3 Parquet]
+        F2[Feast Feature Store\nFileSource]
 
-        F2 -.Direct S3 Read<br/>NO COPY!.-> I2
+        F2 -.Direct S3 Read\nNO COPY!.-> I2
 
-        Benefits2[✅ Single Source of Truth<br/>✅ No Storage Duplication<br/>✅ Immediate Consistency]
+        Benefits2[✅ Single Source of Truth\n✅ No Storage Duplication\n✅ Immediate Consistency]
     end
 
     classDef problemStyle fill:#ffebee,stroke:#c62828
@@ -912,7 +935,7 @@ sequenceDiagram
     participant Iceberg as Iceberg Metadata
     participant S3 as S3 Parquet Files
 
-    User->>API: POST /feast/features<br/>{table: "customer_metrics"}
+    User->>API: POST /feast/features\n{table: "customer_metrics"}
     API->>Feast: create_feature_view()
 
     Note over Feast: 1. Validate Table
@@ -965,7 +988,7 @@ sequenceDiagram
     participant S3 as S3 Storage
     participant Registry as Model Registry
 
-    User->>API: POST /mlops/training/upload<br/>{script, requirements}
+    User->>API: POST /mlops/training/upload\n{script, requirements}
     API->>MLflow: Create training job
     MLflow->>Pod: Create training pod
 
@@ -994,18 +1017,18 @@ flowchart TB
         direction TB
 
         subgraph V1["Version 1 - Development"]
-            V1_Metrics[Accuracy: 0.85<br/>F1: 0.82<br/>Status: Development]
-            V1_Artifacts[model.pkl<br/>feature_importance.png<br/>requirements.txt]
+            V1_Metrics[Accuracy: 0.85\nF1: 0.82\nStatus: Development]
+            V1_Artifacts[model.pkl\nfeature_importance.png\nrequirements.txt]
         end
 
         subgraph V2["Version 2 - Staging"]
-            V2_Metrics[Accuracy: 0.87<br/>F1: 0.85<br/>Status: Staging]
-            V2_Artifacts[model.pkl<br/>confusion_matrix.png<br/>requirements.txt]
+            V2_Metrics[Accuracy: 0.87\nF1: 0.85\nStatus: Staging]
+            V2_Artifacts[model.pkl\nconfusion_matrix.png\nrequirements.txt]
         end
 
         subgraph V3["Version 3 - Production ⭐"]
-            V3_Metrics[Accuracy: 0.89<br/>F1: 0.87<br/>Status: Production]
-            V3_Artifacts[model.pkl<br/>roc_curve.png<br/>requirements.txt]
+            V3_Metrics[Accuracy: 0.89\nF1: 0.87\nStatus: Production]
+            V3_Artifacts[model.pkl\nroc_curve.png\nrequirements.txt]
         end
     end
 
@@ -1151,16 +1174,16 @@ flowchart TB
 
     subgraph Ingress["Ingress Layer"]
         NGINX[NGINX Ingress Controller]
-        Rules["Routing Rules:<br/>asgard.example.com → asgard-app:80<br/>mlflow.example.com → mlflow:5000"]
+        Rules["Routing Rules:\nasgard.example.com → asgard-app:80\nmlflow.example.com → mlflow:5000"]
     end
 
     subgraph Namespace["Kubernetes Namespace: asgard"]
         subgraph Services["Services (ClusterIP)"]
-            SvcAPI[asgard-app<br/>:80]
-            SvcMLflow[mlflow-service<br/>:5000]
-            SvcPG[postgres<br/>:5432]
-            SvcTrino[trino<br/>:8080]
-            SvcAirbyte[airbyte-server<br/>:8001]
+            SvcAPI[asgard-app\n:80]
+            SvcMLflow[mlflow-service\n:5000]
+            SvcPG[postgres\n:5432]
+            SvcTrino[trino\n:8080]
+            SvcAirbyte[airbyte-server\n:8001]
         end
 
         subgraph Deployments["Deployments"]
@@ -1225,7 +1248,8 @@ asgard-app Pod Communication:
 
 ---
 
-## Security & Performance
+## Security 
+    -->> Performance
 
 ### Security Architecture
 
@@ -1234,24 +1258,24 @@ flowchart TB
     subgraph Security["Security Layers"]
         subgraph K8s["Kubernetes RBAC"]
             SA[ServiceAccounts]
-            Roles[Roles & RoleBindings]
+            Roles[Roles  RoleBindings]
             NetPol[NetworkPolicies]
         end
 
         subgraph AWS["AWS IAM"]
             IAM[IAM Roles]
-            Keys[Access Keys<br/>in K8s Secrets]
-            IRSA[IAM Roles for<br/>Service Accounts]
+            Keys[Access Keys\nin K8s Secrets]
+            IRSA[IAM Roles for\nService Accounts]
         end
 
         subgraph App["Application Level"]
-            Validation[Input Validation<br/>Pydantic]
+            Validation[Input Validation\nPydantic]
             Throttle[Rate Limiting]
-            Auth[API Key Auth<br/>Optional]
+            Auth[API Key Auth\nOptional]
         end
 
         subgraph Data["Data Security"]
-            EncryptRest[S3 Encryption at Rest<br/>SSE-S3/SSE-KMS]
+            EncryptRest[S3 Encryption at Rest\nSSE-S3/SSE-KMS]
             EncryptTransit[TLS in Transit]
             Access[S3 IAM Policies]
         end
@@ -1278,23 +1302,23 @@ flowchart TB
 flowchart LR
     subgraph Scaling["Horizontal Scaling Strategies"]
         subgraph API["FastAPI Gateway"]
-            HPA1[Horizontal Pod Autoscaler<br/>Min: 2, Max: 10<br/>CPU: 70%]
+            HPA1[Horizontal Pod Autoscaler\nMin: 2, Max: 10\nCPU: 70%]
         end
 
         subgraph Spark["Spark Jobs"]
-            Dynamic[Dynamic Executor Allocation<br/>Min: 1, Max: 20<br/>Load-based]
+            Dynamic[Dynamic Executor Allocation\nMin: 1, Max: 20\nLoad-based]
         end
 
         subgraph Trino["Trino Cluster"]
-            Workers[Worker Pool Expansion<br/>Add workers on demand]
+            Workers[Worker Pool Expansion\nAdd workers on demand]
         end
 
         subgraph Airbyte["Airbyte Workers"]
-            Replicas[Worker Replicas<br/>Scale based on sync queue]
+            Replicas[Worker Replicas\nScale based on sync queue]
         end
 
         subgraph MLflow["MLflow Server"]
-            Stateless[Stateless Deployment<br/>Can scale pods freely]
+            Stateless[Stateless Deployment\nCan scale pods freely]
         end
     end
 
