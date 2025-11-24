@@ -19,7 +19,7 @@
 9. [Sequence Diagrams](#sequence-diagrams)
 10. [Network & Storage Architecture](#network--storage-architecture)
 11. [Security & Performance](#security--performance)
-12. [Reference Tables](#reference-tables)
+ 
 
 ---
 
@@ -127,8 +127,6 @@ graph TB
 | **Spark Operator**  | Spark on K8s   | 3.5.0       | Spark job management           |
 
 ### Language |
-
-    || Frameworks
 
 | Technology  | Version | Usage                               |
 | ----------- | ------- | ----------------------------------- |
@@ -498,15 +496,6 @@ flowchart TB
     class Driver,Exec1,Exec2,Exec3 sparkStyle
     class Bronze,Silver dataStyle
 ```
-
-**Key Capabilities**:
-
-- **SQL-based transformations** via Spark SQL
-- **Iceberg integration** for reading/writing tables
-- **Dynamic resource allocation**
-- **Auto-scaling** executors based on workload
-- **Job monitoring** via Spark UI
-
 ### 4. DBT + Trino
 
 **Purpose**: SQL-based business logic transformations (Silver → Gold)
@@ -562,14 +551,6 @@ flowchart LR
     class Silver,Gold dataStyle
     class Nessie catalogStyle
 ```
-
-**Key Features**:
-
-- **SQL-first** approach for data transformations
-- **Incremental models** for efficient processing
-- **Testing framework** for data quality
-- **Documentation** generation
-- **Lineage tracking**
 
 ### 5. Feast Feature Store
 
@@ -779,15 +760,6 @@ s3://airbytedestination1/iceberg/
 
 ## Iceberg Integration
 
-### Why Iceberg?
-
-1. **ACID Transactions** - Consistent reads and writes
-2. **Time Travel** - Query data at any point in time
-3. **Schema Evolution** - Add/modify columns without breaking queries
-4. **Hidden Partitioning** - Automatic partition management
-5. **Compaction** - Optimize small files automatically
-6. **Metadata Efficiency** - Fast query planning
-
 ### Iceberg + Nessie Architecture
 
 ```mermaid
@@ -896,53 +868,7 @@ flowchart TB
     class Traditional,I1,E1,L1,F1,Problem1 problemStyle
     class Asgard,I2,F2,Benefits2 goodStyle
 ```
-
-### Implementation Details
-
-**Method: `_get_iceberg_parquet_path()`**
-
-```python
-def _get_iceberg_parquet_path(self, table_fqn: str) -> str:
-    """
-    Query Trino to get the S3 Parquet file path from Iceberg table.
-    Uses the $path system column to extract actual file locations.
-
-    Returns: s3://bucket/iceberg/gold/{table_id}/data/*.parquet
-    """
-```
-
-**Query Example**:
-
-```sql
-SELECT "$path" as file_path
-FROM iceberg.gold.customer_aggregates
-LIMIT 1
-```
-
-**Result**:
-
-```
-
-s3://airbytedestination1/iceberg/gold/efxgs5oersyezxnzydx4vsyou04jna6ti5/data/20251007_082213_00049_yb5wr-4e34e6e9.parquet
-```
-
-**Extracted Path**:
-
-```
-
-s3://airbytedestination1/iceberg/gold/efxgs5oersyezxnzydx4vsyou04jna6ti5/data/*.parquet
-```
-
-### Feast FileSource Configuration
-
-```python
-FileSource(
-    name="customer_features_source",
-    path="s3://airbytedestination1/iceberg/gold/{table_id}/data/*.parquet",
-    timestamp_field="event_timestamp",
-)
-```
-
+ 
 ### Feature Registration Flow
 
 ```mermaid
@@ -979,19 +905,7 @@ sequenceDiagram
     API-->>User: {status: "success", features: [...]}
 ```
 
-### Key Benefits
 
-| Aspect            | Old Approach                | Asgard Approach          |
-| ----------------- | --------------------------- | ------------------------ |
-| **Data Storage**  | Duplicate (Iceberg + Local) | Single (Iceberg S3 only) |
-| **Sync Required** | Yes (Trino → Local)         | No (direct S3 read)      |
-| **Latency**       | Higher (copy overhead)      | Lower (direct access)    |
-| **Storage Cost**  | 2x (Iceberg + Local)        | 1x (Iceberg only)        |
-| **Consistency**   | Eventual (after sync)       | Immediate (same files)   |
-| **Scalability**   | Limited by local disk       | Unlimited (S3)           |
-| **Complexity**    | Higher (sync logic)         | Lower (direct read)      |
-
----
 
 ## MLflow Integration
 
@@ -1347,17 +1261,7 @@ flowchart LR
     class API,Spark,Trino,Airbyte,MLflow,HPA1,Dynamic,Workers,Replicas,Stateless scaleStyle
 ```
 
-### Performance Optimizations
-
-1. **Iceberg Compaction**: Merge small files automatically
-2. **Spark Caching**: In-memory data for iterative processing
-3. **Trino Query Optimization**: Predicate pushdown, partition pruning
-4. **S3 Transfer Acceleration**: Faster uploads/downloads
-5. **Connection Pooling**: Reuse database connections
-6. **Parquet Columnar Format**: Optimized for analytics
-7. **Partition Pruning**: Reduce data scanned
-8. **Metadata Caching**: Cache Feast feature definitions
-
+ 
 ---
 
 ## Reference Tables
@@ -1405,7 +1309,6 @@ flowchart LR
 | **Size**      | Largest          | Medium             | Smallest             |
 | **Updates**   | Append-only      | Overwrite/append   | Usually overwrite    |
 | **Consumers** | Spark            | DBT, analysts      | Feast, ML models     |
-| **Retention** | Indefinite       | 6-12 months        | 3-6 months           |
 
 ### Typical Processing Times
 
@@ -1417,38 +1320,6 @@ flowchart LR
 | Feature Registration | -         | <1 min    | Metadata only      |
 | Model Training       | 100K rows | 15-30 min | Random Forest      |
 | Batch Inference      | 100K rows | 5-10 min  | Depends on model   |
-
----
-
-## Design Decisions
-
-### Why FastAPI?
-
-- **Performance**: Async support for high throughput
-- **Type Safety**: Pydantic validation
-- **Auto Documentation**: OpenAPI/Swagger generation
-- **Modern Python**: Python 3.11+ features
-
-### Why Iceberg over Delta/Hudi?
-
-- **Vendor Neutral**: Not tied to Spark/Databricks
-- **Nessie Integration**: Git-like versioning
-- **Hidden Partitioning**: Simplifies queries
-- **Strong Community**: Apache foundation
-
-### Why Feast for Features?
-
-- **Simplicity**: Easy to define features
-- **Flexibility**: Multiple offline/online stores
-- **ML Framework Agnostic**: Works with any ML library
-- **Direct S3 Read**: No data duplication
-
-### Why Kubernetes?
-
-- **Cloud Agnostic**: Run anywhere (EKS, GKE, on-prem)
-- **Auto Scaling**: HPA, VPA, cluster autoscaler
-- **Service Discovery**: Built-in DNS
-- **Resource Management**: CPU/memory limits and requests
 
 ---
 
@@ -1472,14 +1343,6 @@ flowchart LR
 - **Scalable**: S3 storage, Kubernetes orchestration, dynamic scaling
 - **Developer Friendly**: REST API, auto-documentation, type safety
 - **Production Grade**: Monitoring, logging, error handling built-in
-
-### Next Steps
-
-- **Understand workflows**: [USE_CASE_GUIDE.md](USE_CASE_GUIDE.md)
-- **Test APIs**: [API_TESTING_GUIDE.md](API_TESTING_GUIDE.md)
-- **Debug issues**: [DEBUGGING_GUIDE.md](DEBUGGING_GUIDE.md)
-- **Setup environment**: [ONBOARDING_SETUP.md](ONBOARDING_SETUP.md)
-- **MLOps operations**: [MLOPS_QUICK_REFERENCE.md](MLOPS_QUICK_REFERENCE.md)
 
 ---
 
