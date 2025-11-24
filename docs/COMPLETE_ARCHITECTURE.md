@@ -19,7 +19,6 @@
 9. [Sequence Diagrams](#sequence-diagrams)
 10. [Network & Storage Architecture](#network--storage-architecture)
 11. [Security & Performance](#security--performance)
- 
 
 ---
 
@@ -32,39 +31,36 @@ Asgard is a **unified data lakehouse platform** built on Kubernetes that orchest
 ```mermaid
 graph TB
     subgraph External["External Systems"]
-        DB1[PostgreSQL]
-        DB2[MySQL]
         API1[REST APIs]
     end
 
     subgraph Platform["Asgard Platform - Kubernetes Cluster"]
         subgraph APILayer["API Layer"]
-            Gateway["FastAPI Gateway\nPort 80"]
+            Gateway["FastAPI Gateway<br/>Port 80"]
         end
 
         subgraph Processing["Processing Components"]
-            Airbyte["Airbyte\nData Ingestion"]
-            Spark["Spark on K8s\nData Processing"]
-            DBT["DBT + Trino\nSQL Transformations"]
-            Feast["Feast\nFeature Store"]
-            MLflow["MLflow\nML Platform"]
+            Airbyte["Airbyte<br/>Data Ingestion"]
+                        Spark["Spark on K8s<br/>Data Processing"]
+                        DBT["DBT + Trino<br/>SQL Transformations"]
+                        Feast["Feast<br/>Feature Store"]
+                        MLflow["MLflow<br/>ML Platform"]
         end
 
         subgraph Lakehouse["Data Lakehouse"]
-            Bronze["Bronze Layer\nRaw Data"]
-            Silver["Silver Layer\nCleaned Data"]
-            Gold["Gold Layer\nAggregated Metrics"]
+            Bronze["Bronze Layer<br/>Raw Data"]
+            Silver["Silver Layer<br/>Cleaned Data"]
+            Gold["Gold Layer<br/>Aggregated Metrics"]
         end
 
         subgraph StorageMeta["Storage & Metadata"]
-            S3["S3 Object Storage\nIceberg + Parquet"]
-            Postgres["PostgreSQL\nMetadata"]
-            Nessie["Nessie Catalog\nData Versioning"]
+            S3["S3 Object Storage<br/>Iceberg + Parquet"]
+            Postgres["PostgreSQL<br/>Metadata"]
+            Nessie["Nessie Catalog<br/>Data Versioning"]
         end
     end
 
-    DB1 --> Gateway
-    DB2 --> Gateway
+    
     API1 --> Gateway
     Gateway --> Airbyte
     Gateway --> Spark
@@ -146,7 +142,7 @@ graph TB
 flowchart TB
     subgraph Client["Client Layer"]
         User["Data Engineer / ML Engineer"]
-        API_Docs["Swagger UI\nlocalhost:8000/docs"]
+        API_Docs["Swagger UI<br/>localhost:8000/docs"]
     end
 
     subgraph API["API Layer - FastAPI Gateway"]
@@ -179,8 +175,8 @@ flowchart TB
         end
 
         subgraph Feast_System["Feast Feature Store"]
-            Feast_Registry["Feature Registry\nPostgreSQL"]
-            Feast_OfflineStore["Offline Store\nFile-based"]
+            Feast_Registry["Feature Registry<br/>PostgreSQL"]
+            Feast_OfflineStore["Offline Store<br/>File-based"]
         end
 
         subgraph MLflow_System["MLflow Platform"]
@@ -192,18 +188,18 @@ flowchart TB
 
     subgraph Lakehouse["Data Lakehouse - Medallion Architecture"]
         direction LR
-        Bronze["Bronze Layer\nRaw Data\nParquet"]
-        Silver["Silver Layer\nCleaned Data\nParquet"]
-        Gold["Gold Layer\nML-Ready Features\nParquet"]
+        Bronze["Bronze Layer<br/>Raw Data<br/>Parquet"]
+        Silver["Silver Layer<br/>Cleaned Data<br/>Parquet"]
+        Gold["Gold Layer<br/>ML-Ready Features<br/>Parquet"]
 
         Bronze -->|"Spark SQL\nCleansing"| Silver
         Silver -->|"DBT + Trino\nAggregation"| Gold
     end
 
     subgraph Storage["Storage and Catalog"]
-        S3["S3 Object Storage\ns3://airbytedestination1"]
-        Nessie["Nessie Catalog\nGit-like Versioning"]
-        Postgres["PostgreSQL\nMetadata Store"]
+        S3["S3 Object Storage<br/>s3://airbytedestination1"]
+        Nessie["Nessie Catalog<br/>Git-like Versioning"]
+        Postgres["PostgreSQL<br/>Metadata Store"]
     end
 
     User --> API_Docs
@@ -235,7 +231,7 @@ flowchart TB
     Gold --> S3
     S3 <-->|"Metadata"| Nessie
 
-    Feast_OfflineStore -."Direct S3 Read\nNO COPY!".-> Gold
+    Feast_OfflineStore -."Direct S3 Read<br/>NO COPY!".-> Gold
     Feast_Registry --> Postgres
     MLflow_Tracking --> Postgres
     MLflow_Tracking -->|"Artifacts"| S3
@@ -434,9 +430,6 @@ Source DB → Airbyte Connector → Normalization → S3/Iceberg (Bronze)
 
 - PostgreSQL
 - MySQL
-- MongoDB
-- REST APIs
-- File sources (CSV, JSON)
 
 ### 3. Spark on Kubernetes
 
@@ -445,27 +438,27 @@ Source DB → Airbyte Connector → Normalization → S3/Iceberg (Bronze)
 ```mermaid
 flowchart TB
     subgraph API["API Request"]
-        Request["POST /spark/transform\njob_name, sql_query, output_table"]
+        Request["POST /spark/transform<br/> job_name, sql_query, output_table"]
     end
 
     subgraph Operator["Spark Operator"]
-        CustomResource["SparkApplication\nCustom Resource"]
+        CustomResource["SparkApplication<br/>Custom Resource"]
         Controller["Operator Controller"]
     end
 
     subgraph SparkCluster["Spark Cluster"]
-        Driver["Driver Pod\n- Job Coordinator\n- Spark SQL\n- UI :4040"]
+        Driver["Driver Pod<br/>- Job Coordinator<br/>- Spark SQL<br/>- UI :4040"]
 
         subgraph Executors["Executor Pods"]
-            Exec1["Executor 1\n2 cores, 4GB"]
-            Exec2["Executor 2\n2 cores, 4GB"]
-            Exec3["Executor 3\n2 cores, 4GB"]
+            Exec1["Executor 1<br/>2 cores, 4GB"]
+            Exec2["Executor 2<br/>2 cores, 4GB"]
+            Exec3["Executor 3<br/>2 cores, 4GB"]
         end
     end
 
     subgraph Data["Data Lakehouse"]
-        Bronze["Bronze Layer\nRead"]
-        Silver["Silver Layer\nWrite"]
+        Bronze["Bronze Layer<br/>Read"]
+        Silver["Silver Layer<br/>Write"]
     end
 
     Request --> CustomResource
@@ -496,6 +489,73 @@ flowchart TB
     class Driver,Exec1,Exec2,Exec3 sparkStyle
     class Bronze,Silver dataStyle
 ```
+
+#### Spark Documentation
+
+**Key Capabilities**:
+
+- **SQL-based transformations** via Spark SQL
+- **Iceberg integration** for reading/writing tables
+- **Dynamic resource allocation**
+- **Auto-scaling** executors based on workload
+- **Job monitoring** via Spark UI
+
+**Docker Image Configuration**:
+
+Base Image: `apache/spark-py:v3.4.0`
+
+**Included Dependencies**:
+
+- Hadoop AWS 3.3.4 (S3A support)
+- AWS Java SDK 1.12.262
+- Iceberg Spark Runtime 1.9.0
+- Iceberg Nessie 1.9.0
+- Nessie Client 0.104.1
+
+**SQL Transformation Script** (`sql_transform_embedded.py`):
+
+Core features:
+
+1. Generic SQL transformations via Spark SQL
+2. Multi-source Parquet reading
+3. Automatic Iceberg table creation in Nessie catalog
+4. S3A filesystem auto-configuration
+5. Robust error handling with fallback strategies
+
+Configuration:
+
+```python
+ICEBERG_ENABLED = True
+ICEBERG_CATALOG_NAME = "nessie"
+ICEBERG_WAREHOUSE = "s3a://airbytedestination1/iceberg/"
+NESSIE_URI = "http://nessie.data-platform.svc.cluster.local:19120/api/v1"
+NESSIE_REF = "main"
+ICEBERG_WRITE_MODE = "append"  # append | overwrite | create_or_replace
+```
+
+**Spark Configuration Parameters**:
+
+- `spark.sql.transform.query` - SQL query to execute
+- `spark.sql.transform.sources` - JSON array of source paths
+- `spark.sql.transform.destination` - Destination path
+- `spark.sql.transform.writeMode` - Write mode
+
+**Resource Recommendations**:
+
+| Workload | Executors | Cores | Memory | Driver Memory |
+| -------- | --------- | ----- | ------ | ------------- |
+| Small    | 1-2       | 1-2   | 2g     | 1g            |
+| Medium   | 2-5       | 2     | 4g     | 2g            |
+| Large    | 5-10      | 2-4   | 8g     | 4g            |
+| XLarge   | 10-20     | 4     | 16g    | 8g            |
+
+**CI/CD Pipeline**:
+
+- Automated build on push to `dev` branch
+- Pushed to ECR: `637423187518.dkr.ecr.eu-north-1.amazonaws.com/spark-custom`
+- Automated testing of Spark, Python, S3A, and PySpark
+- Security vulnerability scanning via ECR
+
 ### 4. DBT + Trino
 
 **Purpose**: SQL-based business logic transformations (Silver → Gold)
@@ -508,18 +568,18 @@ flowchart LR
 
     subgraph DBT["DBT Service"]
         Service["DBT Service"]
-        Models["SQL Models\n- customer_metrics.sql\n- product_analytics.sql"]
+        Models["SQL Models<br/> - customer_metrics.sql<br/>- product_analytics.sql"]
     end
 
     subgraph Trino["Trino Cluster"]
-        Coordinator["Trino Coordinator\nQuery Planning"]
-        Worker1["Worker 1\nQuery Execution"]
-        Worker2["Worker 2\nQuery Execution"]
+        Coordinator["Trino Coordinator<br/>Query Planning"]
+        Worker1["Worker 1<br/>Query Execution"]
+        Worker2["Worker 2<br/>Query Execution"]
     end
 
     subgraph Iceberg["Iceberg Tables"]
-        Silver["Silver Layer\ncustomers_cleaned\ntransactions_cleaned"]
-        Gold["Gold Layer\ncustomer_metrics\nproduct_analytics"]
+        Silver["Silver Layer<br/>customers_cleaned<br/>transactions_cleaned"]
+        Gold["Gold Layer<br/>customer_metrics<br/>product_analytics"]
     end
 
     subgraph Catalog["Nessie Catalog"]
@@ -618,26 +678,26 @@ flowchart TB
 ```mermaid
 flowchart TB
     subgraph API["API Layer"]
-        Upload["POST /mlops/training/upload\nTraining Script"]
-        Deploy["POST /mlops/inference\nPrediction Request"]
+        Upload["POST /mlops/training/upload<br/>Training Script"]
+        Deploy["POST /mlops/inference<br/>Prediction Request"]
     end
 
     subgraph MLflow["MLflow Platform"]
-        Tracking["Tracking Server\n:5000"]
+        Tracking["Tracking Server<br/>:5000"]
         Registry["Model Registry"]
 
         subgraph Backend["Storage Backend"]
-            MetaDB["PostgreSQL\nRuns, Metrics, Params"]
-            ArtifactS3["S3\nModels, Plots, Logs"]
+            MetaDB["PostgreSQL<br/>Runs, Metrics, Params"]
+            ArtifactS3["S3<br/>Models, Plots, Logs"]
         end
     end
 
     subgraph Execution["Training Execution"]
-        TrainingPod["Training Job Pod\n- Install deps\n- Fetch features\n- Train model"]
+        TrainingPod["Training Job Pod<br/>- Install deps<br/>- Fetch features<br/>- Train model"]
     end
 
     subgraph Inference["Model Serving"]
-        InferencePod["Inference Service\n- Load model\n- Make predictions"]
+        InferencePod["Inference Service<br/>- Load model<br/>- Make predictions"]
     end
 
     Upload --> Tracking
@@ -709,8 +769,8 @@ flowchart LR
         G1 --> G2 --> G3 --> G4
     end
 
-    Bronze -->|Spark SQL\nCleansing| Silver
-    Silver -->|DBT + Trino\nAggregation| Gold
+    Bronze -->|Spark SQL <br/>Cleansing| Silver
+    Silver -->|DBT + Trino<br/>Aggregation| Gold
 
     classDef bronzeStyle fill:#fbe9e7,stroke:#d84315,color:#000
     classDef silverStyle fill:#e0f2f1,stroke:#00695c,color:#000
@@ -841,7 +901,7 @@ ADD COLUMN loyalty_tier VARCHAR;
 ```mermaid
 flowchart TB
     subgraph Traditional["❌ Traditional Approach - Data Duplication"]
-        I1[Iceberg Gold Layer\nS3 Parquet]
+        I1[Iceberg Gold Layer<br/>S3 Parquet]
         E1[Export/ETL Job]
         L1[Local Parquet Copy]
         F1[Feast Feature Store]
@@ -850,16 +910,16 @@ flowchart TB
         E1 -->|Write| L1
         L1 --> F1
 
-        Problem1[❌ 2x Storage Cost\n❌ Sync Overhead\n❌ Consistency Issues]
+        Problem1[❌ 2x Storage Cost<br/>❌ Sync Overhead<br/>❌ Consistency Issues]
     end
 
     subgraph Asgard["✅ Asgard Approach - Zero Duplication"]
-        I2[Iceberg Gold Layer\nS3 Parquet]
-        F2[Feast Feature Store\nFileSource]
+        I2[Iceberg Gold Layer<br/>S3 Parquet]
+        F2[Feast Feature Store<br/>FileSource]
 
-        F2 -.Direct S3 Read\nNO COPY!.-> I2
+        F2 -.Direct S3 Read<br/>NO COPY!.-> I2
 
-        Benefits2[✅ Single Source of Truth\n✅ No Storage Duplication\n✅ Immediate Consistency]
+        Benefits2[✅ Single Source of Truth<br/>✅ No Storage Duplication<br/>✅ Immediate Consistency]
     end
 
     classDef problemStyle fill:#ffebee,stroke:#c62828,color:#000
@@ -868,7 +928,7 @@ flowchart TB
     class Traditional,I1,E1,L1,F1,Problem1 problemStyle
     class Asgard,I2,F2,Benefits2 goodStyle
 ```
- 
+
 ### Feature Registration Flow
 
 ```mermaid
@@ -880,7 +940,7 @@ sequenceDiagram
     participant Iceberg as Iceberg Metadata
     participant S3 as S3 Parquet Files
 
-    User->>API: POST /feast/features\n{table: "customer_metrics"}
+    User->>API: POST /feast/features<br/>{table: "customer_metrics"}
     API->>Feast: create_feature_view()
 
     Note over Feast: 1. Validate Table
@@ -905,8 +965,6 @@ sequenceDiagram
     API-->>User: {status: "success", features: [...]}
 ```
 
-
-
 ## MLflow Integration
 
 ### Training Workflow
@@ -921,7 +979,7 @@ sequenceDiagram
     participant S3 as S3 Storage
     participant Registry as Model Registry
 
-    User->>API: POST /mlops/training/upload\n{script, requirements}
+    User->>API: POST /mlops/training/upload<br/>{script, requirements}
     API->>MLflow: Create training job
     MLflow->>Pod: Create training pod
 
@@ -950,18 +1008,18 @@ flowchart TB
         direction TB
 
         subgraph V1["Version 1 - Development"]
-            V1_Metrics[Accuracy: 0.85\nF1: 0.82\nStatus: Development]
-            V1_Artifacts[model.pkl\nfeature_importance.png\nrequirements.txt]
+            V1_Metrics[Accuracy: 0.85<br/>F1: 0.82<br/>Status: Development]
+            V1_Artifacts[model.pkl<br/>feature_importance.png<br/>requirements.txt]
         end
 
         subgraph V2["Version 2 - Staging"]
-            V2_Metrics[Accuracy: 0.87\nF1: 0.85\nStatus: Staging]
-            V2_Artifacts[model.pkl\nconfusion_matrix.png\nrequirements.txt]
+            V2_Metrics[Accuracy: 0.87<br/>F1: 0.85<br/>Status: Staging]
+            V2_Artifacts[model.pkl<br/>confusion_matrix.png<br/>requirements.txt]
         end
 
         subgraph V3["Version 3 - Production ⭐"]
-            V3_Metrics[Accuracy: 0.89\nF1: 0.87\nStatus: Production]
-            V3_Artifacts[model.pkl\nroc_curve.png\nrequirements.txt]
+            V3_Metrics[Accuracy: 0.89<br/>F1: 0.87<br/>Status: Production]
+            V3_Artifacts[model.pkl<br/>roc_curve.png<br/>requirements.txt]
         end
     end
 
@@ -1107,16 +1165,16 @@ flowchart TB
 
     subgraph Ingress["Ingress Layer"]
         NGINX[NGINX Ingress Controller]
-        Rules["Routing Rules:\nasgard.example.com → asgard-app:80\nmlflow.example.com → mlflow:5000"]
+        Rules["Routing Rules:<br>asgard.example.com → asgard-app:80<br>mlflow.example.com → mlflow:5000"]
     end
 
     subgraph Namespace["Kubernetes Namespace: asgard"]
         subgraph Services["Services (ClusterIP)"]
-            SvcAPI[asgard-app\n:80]
-            SvcMLflow[mlflow-service\n:5000]
-            SvcPG[postgres\n:5432]
-            SvcTrino[trino\n:8080]
-            SvcAirbyte[airbyte-server\n:8001]
+            SvcAPI[asgard-app<br>:80]
+            SvcMLflow[mlflow-service<br>:5000]
+            SvcPG[postgres<br>:5432]
+            SvcTrino[trino<br>:8080]
+            SvcAirbyte[airbyte-server<br>:8001]
         end
 
         subgraph Deployments["Deployments"]
@@ -1199,18 +1257,18 @@ flowchart TB
 
         subgraph AWS["AWS IAM"]
             IAM[IAM Roles]
-            Keys[Access Keys\nin K8s Secrets]
-            IRSA[IAM Roles for\nService Accounts]
+            Keys[Access Keys<br>in K8s Secrets]
+            IRSA[IAM Roles for<br>Service Accounts]
         end
 
         subgraph App["Application Level"]
-            Validation[Input Validation\nPydantic]
+            Validation[Input Validation<br>Pydantic]
             Throttle[Rate Limiting]
-            Auth[API Key Auth\nOptional]
+            Auth[API Key Auth<br>Optional]
         end
 
         subgraph Data["Data Security"]
-            EncryptRest[S3 Encryption at Rest\nSSE-S3/SSE-KMS]
+            EncryptRest[S3 Encryption at Rest<br>SSE-S3/SSE-KMS]
             EncryptTransit[TLS in Transit]
             Access[S3 IAM Policies]
         end
@@ -1261,7 +1319,6 @@ flowchart LR
     class API,Spark,Trino,Airbyte,MLflow,HPA1,Dynamic,Workers,Replicas,Stateless scaleStyle
 ```
 
- 
 ---
 
 ## Reference Tables

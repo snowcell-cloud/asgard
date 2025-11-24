@@ -18,7 +18,7 @@
 7. [First Steps](#first-steps)
 8. [Next Steps](#next-steps)
 
----
+--- 
 
 ## What is Asgard?
 
@@ -84,8 +84,8 @@ External DBs → Airbyte → Spark → DBT → Feast → MLOps
 
 ```bash
 # Clone Asgard repository
-git clone https://github.com/your-org/asgard-dev.git
-cd asgard-dev
+git clone https://github.com/your-org/asgard.git
+cd asgard
 ```
 
 ### Step 2: Deploy to Kubernetes
