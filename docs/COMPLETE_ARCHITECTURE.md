@@ -29,7 +29,7 @@
 
 Asgard is a **unified data lakehouse platform** built on Kubernetes that orchestrates the complete data lifecycle from ingestion to ML deployment through a single FastAPI gateway.
 
-````mermaid
+```mermaid
 graph TB
     subgraph External["External Systems"]
         DB1[PostgreSQL]
@@ -94,7 +94,9 @@ graph TB
     class Airbyte,Spark,DBT,Feast,MLflow process
     class Bronze,Silver,Gold data
     class S3,Postgres,Nessie storage
-```### Key Architectural Principles
+```
+
+### Key Architectural Principles
 
 1. **API-First Design** - All operations accessible via REST API
 2. **Medallion Architecture** - Bronze → Silver → Gold data layers
@@ -125,6 +127,7 @@ graph TB
 | **Spark Operator**  | Spark on K8s   | 3.5.0       | Spark job management           |
 
 ### Language |
+
     || Frameworks
 
 | Technology  | Version | Usage                               |
@@ -245,7 +248,7 @@ flowchart TB
     class Airbyte_System,Spark_System,DBT_System,Feast_System,MLflow_System processStyle
     class Bronze,Silver,Gold dataStyle
     class S3,Nessie,Postgres storageStyle
-````
+```
 
 ### Data Flow - End-to-End Pipeline
 
@@ -805,9 +808,7 @@ flowchart TB
     Spark & Trino & DBT -->|Catalog API| Nessie
     Nessie -->|Points to| Metadata
     Metadata -->|Manifest List| Snap1 & Snap2
-    Snap1 |
-    || Snap2 -->|References| File1 & File2 |
-    || File3
+    Snap1 & Snap2 -->|References| File1 & File2 & File3
 
     classDef clientStyle fill:#e3f2fd,stroke:#1565c0
     classDef nessieStyle fill:#f3e5f5,stroke:#6a1b9a
@@ -1248,7 +1249,8 @@ asgard-app Pod Communication:
 
 ---
 
-## Security 
+## Security
+
     -->> Performance
 
 ### Security Architecture
