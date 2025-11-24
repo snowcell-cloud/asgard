@@ -493,7 +493,9 @@ flowchart TB
     class CustomResource,Controller operatorStyle
     class Driver,Exec1,Exec2,Exec3 sparkStyle
     class Bronze,Silver dataStyle
-```**Key Capabilities**:
+```
+
+**Key Capabilities**:
 
 - **SQL-based transformations** via Spark SQL
 - **Iceberg integration** for reading/writing tables
@@ -555,7 +557,9 @@ flowchart LR
     class Coordinator,Worker1,Worker2 trinoStyle
     class Silver,Gold dataStyle
     class Nessie catalogStyle
-```**Key Features**:
+```
+
+**Key Features**:
 
 - **SQL-first** approach for data transformations
 - **Incremental models** for efficient processing
@@ -618,7 +622,9 @@ flowchart TB
     class Gold,Metadata dataStyle
     class TrinoQuery trinoStyle
     class Training,Inference mlStyle
-```**Unique Design**: Direct S3 Parquet reads from Iceberg Gold layer
+```
+
+**Unique Design**: Direct S3 Parquet reads from Iceberg Gold layer
 
 ### 6. MLflow Platform
 
@@ -668,7 +674,9 @@ flowchart TB
     class Tracking,Registry mlflowStyle
     class MetaDB,ArtifactS3 storageStyle
     class TrainingPod,InferencePod execStyle
-```**Model Lifecycle**:
+```
+
+**Model Lifecycle**:
 
 ````
 
