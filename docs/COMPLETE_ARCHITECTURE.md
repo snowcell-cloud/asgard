@@ -200,12 +200,13 @@ flowchart TB
         Silver -->|"DBT + Trino\nAggregation"| Gold
     end
 
-    subgraph Storage["Storage |
-    || Catalog"]
+    subgraph Storage["Storage and Catalog"]
         S3["S3 Object Storage\ns3://airbytedestination1"]
         Nessie["Nessie Catalog\nGit-like Versioning"]
         Postgres["PostgreSQL\nMetadata Store"]
-    end    User --> API_Docs
+    end
+
+    User --> API_Docs
     API_Docs --> Router_Airbyte
     API_Docs --> Router_Spark
     API_Docs --> Router_DBT
@@ -237,7 +238,9 @@ flowchart TB
     Feast_OfflineStore -."Direct S3 Read\nNO COPY!".-> Gold
     Feast_Registry --> Postgres
     MLflow_Tracking --> Postgres
-    MLflow_Tracking -->|"Artifacts"| S3    classDef clientStyle fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    MLflow_Tracking -->|"Artifacts"| S3
+
+    classDef clientStyle fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
     classDef apiStyle fill:#fff3e0,stroke:#f57c00,stroke-width:2px
     classDef processStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
     classDef dataStyle fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
@@ -417,13 +420,13 @@ flowchart TB
     class Source1,Source2,Source3 sourceStyle
     class Server,Temporal,Worker1,Worker2,Database airbyteStyle
     class Table1,Table2,Table3 dataStyle
-```**Data Flow**:
+```
 
-````
+**Data Flow**:
 
+```
 Source DB → Airbyte Connector → Normalization → S3/Iceberg (Bronze)
-
-````
+```
 
 **Supported Sources**:
 
