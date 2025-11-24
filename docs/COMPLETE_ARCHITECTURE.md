@@ -85,10 +85,10 @@ graph TB
     MLflow --> Postgres
     Feast --> Postgres
 
-    classDef api fill:#e1f5ff,stroke:#01579b
-    classDef process fill:#f3e5f5,stroke:#4a148c
-    classDef data fill:#e8f5e9,stroke:#1b5e20
-    classDef storage fill:#fff3e0,stroke:#e65100
+    classDef api fill:#e1f5ff,stroke:#01579b,color:#000
+    classDef process fill:#f3e5f5,stroke:#4a148c,color:#000
+    classDef data fill:#e8f5e9,stroke:#1b5e20,color:#000
+    classDef storage fill:#fff3e0,stroke:#e65100,color:#000
 
     class Gateway api
     class Airbyte,Spark,DBT,Feast,MLflow process
@@ -242,11 +242,11 @@ flowchart TB
     MLflow_Tracking --> Postgres
     MLflow_Tracking -->|"Artifacts"| S3
 
-    classDef clientStyle fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    classDef apiStyle fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    classDef processStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    classDef dataStyle fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
-    classDef storageStyle fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef clientStyle fill:#e3f2fd,stroke:#1976d2,color:#000,stroke-width:2px
+    classDef apiStyle fill:#fff3e0,stroke:#f57c00,color:#000,stroke-width:2px
+    classDef processStyle fill:#f3e5f5,stroke:#7b1fa2,color:#000,stroke-width:2px
+    classDef dataStyle fill:#e8f5e9,stroke:#388e3c,color:#000,stroke-width:2px
+    classDef storageStyle fill:#fce4ec,stroke:#c2185b,color:#000,stroke-width:2px
 
     class User,API_Docs clientStyle
     class Router_Airbyte,Router_Spark,Router_DBT,Router_Feast,Router_MLOps apiStyle
@@ -308,10 +308,10 @@ flowchart LR
     Model_Registry --> Inference_API
     Inference_API --> Applications
 
-    classDef sourceStyle fill:#e1f5fe,stroke:#01579b
-    classDef transformStyle fill:#f3e5f5,stroke:#6a1b9a
-    classDef dataStyle fill:#e8f5e9,stroke:#2e7d32
-    classDef mlStyle fill:#fff3e0,stroke:#ef6c00
+    classDef sourceStyle fill:#e1f5fe,stroke:#01579b,color:#000
+    classDef transformStyle fill:#f3e5f5,stroke:#6a1b9a,color:#000
+    classDef dataStyle fill:#e8f5e9,stroke:#2e7d32,color:#000
+    classDef mlStyle fill:#fff3e0,stroke:#ef6c00,color:#000
 
     class PG,MySQL,APIs sourceStyle
     class Airbyte_Sync,Spark_Clean,DBT_Agg transformStyle
@@ -416,9 +416,9 @@ flowchart TB
     Worker1 --> Table2
     Worker2 --> Table3
 
-    classDef sourceStyle fill:#e3f2fd,stroke:#1565c0
-    classDef airbyteStyle fill:#f3e5f5,stroke:#6a1b9a
-    classDef dataStyle fill:#e8f5e9,stroke:#2e7d32
+    classDef sourceStyle fill:#e3f2fd,stroke:#1565c0,color:#000
+    classDef airbyteStyle fill:#f3e5f5,stroke:#6a1b9a,color:#000
+    classDef dataStyle fill:#e8f5e9,stroke:#2e7d32,color:#000
 
     class Source1,Source2,Source3 sourceStyle
     class Server,Temporal,Worker1,Worker2,Database airbyteStyle
@@ -488,10 +488,10 @@ flowchart TB
     Exec2 -->|"Write"| Silver
     Exec3 -->|"Write"| Silver
 
-    classDef apiStyle fill:#fff3e0,stroke:#f57c00
-    classDef operatorStyle fill:#e1f5fe,stroke:#0277bd
-    classDef sparkStyle fill:#f3e5f5,stroke:#6a1b9a
-    classDef dataStyle fill:#e8f5e9,stroke:#2e7d32
+    classDef apiStyle fill:#fff3e0,stroke:#f57c00,color:#000
+    classDef operatorStyle fill:#e1f5fe,stroke:#0277bd,color:#000
+    classDef sparkStyle fill:#f3e5f5,stroke:#6a1b9a,color:#000
+    classDef dataStyle fill:#e8f5e9,stroke:#2e7d32,color:#000
 
     class Request apiStyle
     class CustomResource,Controller operatorStyle
@@ -550,11 +550,11 @@ flowchart LR
     Silver <-->|"Metadata"| Nessie
     Gold <-->|"Metadata"| Nessie
 
-    classDef apiStyle fill:#fff3e0,stroke:#f57c00
-    classDef dbtStyle fill:#e8f5e9,stroke:#2e7d32
-    classDef trinoStyle fill:#e1f5fe,stroke:#0277bd
-    classDef dataStyle fill:#f3e5f5,stroke:#6a1b9a
-    classDef catalogStyle fill:#fce4ec,stroke:#c2185b
+    classDef apiStyle fill:#fff3e0,stroke:#f57c00,color:#000
+    classDef dbtStyle fill:#e8f5e9,stroke:#2e7d32,color:#000
+    classDef trinoStyle fill:#e1f5fe,stroke:#0277bd,color:#000
+    classDef dataStyle fill:#f3e5f5,stroke:#6a1b9a,color:#000
+    classDef catalogStyle fill:#fce4ec,stroke:#c2185b,color:#000
 
     class Request apiStyle
     class Service,Models dbtStyle
@@ -615,11 +615,11 @@ flowchart TB
     OfflineStore -->|"Features"| Training
     OfflineStore -->|"Features"| Inference
 
-    classDef apiStyle fill:#fff3e0,stroke:#f57c00
-    classDef feastStyle fill:#e8f5e9,stroke:#2e7d32
-    classDef dataStyle fill:#f3e5f5,stroke:#6a1b9a
-    classDef trinoStyle fill:#e1f5fe,stroke:#0277bd
-    classDef mlStyle fill:#fce4ec,stroke:#c2185b
+    classDef apiStyle fill:#fff3e0,stroke:#f57c00,color:#000
+    classDef feastStyle fill:#e8f5e9,stroke:#2e7d32,color:#000
+    classDef dataStyle fill:#f3e5f5,stroke:#6a1b9a,color:#000
+    classDef trinoStyle fill:#e1f5fe,stroke:#0277bd,color:#000
+    classDef mlStyle fill:#fce4ec,stroke:#c2185b,color:#000
 
     class Register,Retrieve apiStyle
     class Service,Registry,OfflineStore feastStyle
@@ -669,10 +669,10 @@ flowchart TB
     InferencePod -->|"Load Model"| ArtifactS3
     Registry -->|"Version Info"| InferencePod
 
-    classDef apiStyle fill:#fff3e0,stroke:#f57c00
-    classDef mlflowStyle fill:#e8f5e9,stroke:#2e7d32
-    classDef storageStyle fill:#e1f5fe,stroke:#0277bd
-    classDef execStyle fill:#f3e5f5,stroke:#6a1b9a
+    classDef apiStyle fill:#fff3e0,stroke:#f57c00,color:#000
+    classDef mlflowStyle fill:#e8f5e9,stroke:#2e7d32,color:#000
+    classDef storageStyle fill:#e1f5fe,stroke:#0277bd,color:#000
+    classDef execStyle fill:#f3e5f5,stroke:#6a1b9a,color:#000
 
     class Upload,Deploy apiStyle
     class Tracking,Registry mlflowStyle
@@ -731,9 +731,9 @@ flowchart LR
     Bronze -->|Spark SQL\nCleansing| Silver
     Silver -->|DBT + Trino\nAggregation| Gold
 
-    classDef bronzeStyle fill:#fbe9e7,stroke:#d84315
-    classDef silverStyle fill:#e0f2f1,stroke:#00695c
-    classDef goldStyle fill:#fff8e1,stroke:#f57f17
+    classDef bronzeStyle fill:#fbe9e7,stroke:#d84315,color:#000
+    classDef silverStyle fill:#e0f2f1,stroke:#00695c,color:#000
+    classDef goldStyle fill:#fff8e1,stroke:#f57f17,color:#000
 
     class Bronze,B1,B2,B3,B4 bronzeStyle
     class Silver,S1,S2,S3,S4 silverStyle
@@ -826,10 +826,10 @@ flowchart TB
     Metadata -->|Manifest List| Snap1 & Snap2
     Snap1 & Snap2 -->|References| File1 & File2 & File3
 
-    classDef clientStyle fill:#e3f2fd,stroke:#1565c0
-    classDef nessieStyle fill:#f3e5f5,stroke:#6a1b9a
-    classDef metaStyle fill:#fff3e0,stroke:#ef6c00
-    classDef dataStyle fill:#e8f5e9,stroke:#2e7d32
+    classDef clientStyle fill:#e3f2fd,stroke:#1565c0,color:#000
+    classDef nessieStyle fill:#f3e5f5,stroke:#6a1b9a,color:#000
+    classDef metaStyle fill:#fff3e0,stroke:#ef6c00,color:#000
+    classDef dataStyle fill:#e8f5e9,stroke:#2e7d32,color:#000
 
     class Spark,Trino,DBT clientStyle
     class Nessie,Main,Dev,Staging nessieStyle
@@ -890,8 +890,8 @@ flowchart TB
         Benefits2[✅ Single Source of Truth\n✅ No Storage Duplication\n✅ Immediate Consistency]
     end
 
-    classDef problemStyle fill:#ffebee,stroke:#c62828
-    classDef goodStyle fill:#e8f5e9,stroke:#2e7d32
+    classDef problemStyle fill:#ffebee,stroke:#c62828,color:#000
+    classDef goodStyle fill:#e8f5e9,stroke:#2e7d32,color:#000
 
     class Traditional,I1,E1,L1,F1,Problem1 problemStyle
     class Asgard,I2,F2,Benefits2 goodStyle
@@ -1054,9 +1054,9 @@ flowchart TB
     V1 -->|Promote| V2
     V2 -->|Promote| V3
 
-    classDef devStyle fill:#e3f2fd,stroke:#1565c0
-    classDef stagingStyle fill:#fff3e0,stroke:#ef6c00
-    classDef prodStyle fill:#e8f5e9,stroke:#2e7d32
+    classDef devStyle fill:#e3f2fd,stroke:#1565c0,color:#000
+    classDef stagingStyle fill:#fff3e0,stroke:#ef6c00,color:#000
+    classDef prodStyle fill:#e8f5e9,stroke:#2e7d32,color:#000
 
     class V1,V1_Metrics,V1_Artifacts devStyle
     class V2,V2_Metrics,V2_Artifacts stagingStyle
@@ -1240,11 +1240,11 @@ flowchart TB
     PodPG --> PVC2
     PodAPI1 & PodAPI2 & PodMLflow & PodTrino --> S3
 
-    classDef externalStyle fill:#e3f2fd,stroke:#1565c0
-    classDef ingressStyle fill:#fff3e0,stroke:#ef6c00
-    classDef serviceStyle fill:#f3e5f5,stroke:#6a1b9a
-    classDef podStyle fill:#e8f5e9,stroke:#2e7d32
-    classDef storageStyle fill:#fce4ec,stroke:#c2185b
+    classDef externalStyle fill:#e3f2fd,stroke:#1565c0,color:#000
+    classDef ingressStyle fill:#fff3e0,stroke:#ef6c00,color:#000
+    classDef serviceStyle fill:#f3e5f5,stroke:#6a1b9a,color:#000
+    classDef podStyle fill:#e8f5e9,stroke:#2e7d32,color:#000
+    classDef storageStyle fill:#fce4ec,stroke:#c2185b,color:#000
 
     class Browser,Client externalStyle
     class NGINX,Rules ingressStyle
@@ -1306,10 +1306,10 @@ flowchart TB
     AWS --> App
     App --> Data
 
-    classDef k8sStyle fill:#e3f2fd,stroke:#1565c0
-    classDef awsStyle fill:#fff3e0,stroke:#ef6c00
-    classDef appStyle fill:#e8f5e9,stroke:#2e7d32
-    classDef dataStyle fill:#f3e5f5,stroke:#6a1b9a
+    classDef k8sStyle fill:#e3f2fd,stroke:#1565c0,color:#000
+    classDef awsStyle fill:#fff3e0,stroke:#ef6c00,color:#000
+    classDef appStyle fill:#e8f5e9,stroke:#2e7d32,color:#000
+    classDef dataStyle fill:#f3e5f5,stroke:#6a1b9a,color:#000
 
     class K8s,SA,Roles,NetPol k8sStyle
     class AWS,IAM,Keys,IRSA awsStyle
@@ -1343,7 +1343,7 @@ flowchart LR
         end
     end
 
-    classDef scaleStyle fill:#e8f5e9,stroke:#2e7d32
+    classDef scaleStyle fill:#e8f5e9,stroke:#2e7d32,color:#000
     class API,Spark,Trino,Airbyte,MLflow,HPA1,Dynamic,Workers,Replicas,Stateless scaleStyle
 ```
 
