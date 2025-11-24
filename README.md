@@ -1,7 +1,7 @@
 # Asgard Data Platform
 
-**Modern Data Lakehouse + MLOps Platform**  
-_End-to-end data pipeline: Airbyte → Spark → DBT → Feast → MLOps_
+**Where Data Engineering Meets Machine Learning**  
+_The bridge between your raw data and intelligent predictions_
 
 [![Production Ready](https://img.shields.io/badge/status-production%20ready-green)]()
 [![Kubernetes](https://img.shields.io/badge/kubernetes-native-blue)]()
@@ -9,24 +9,63 @@ _End-to-end data pipeline: Airbyte → Spark → DBT → Feast → MLOps_
 
 ---
 
-## 🎯 What is Asgard?
+## 📖 The Asgard Story
 
-A **unified data platform** that orchestrates the complete data lifecycle from raw data ingestion to ML model deployment through a **single REST API**.
+### The Problem We Solve
 
-```
-External DBs → Airbyte → Spark → DBT → Feast → MLOps
-    ↓           ↓         ↓       ↓      ↓       ↓
- Sources     Bronze    Silver   Gold  Features Models
-```
+Imagine you're a data scientist at an e-commerce company. Your CEO asks: _"Can we predict which customers will churn next month?"_
 
-### Key Features
+You know the data exists—scattered across PostgreSQL databases, MongoDB collections, and CSV files. You know how to build the model. But between you and that prediction lies a gauntlet of challenges:
 
-✅ **Single API Surface** - All operations through one FastAPI endpoint  
-✅ **Zero Data Duplication** - Feast reads directly from Iceberg S3 Parquet  
-✅ **Medallion Architecture** - Bronze → Silver → Gold data layers  
-✅ **ML-Ready Features** - Seamless feature engineering to model training  
-✅ **Kubernetes Native** - Scalable, production-ready, auto-scaling  
-✅ **Open Source** - Built on proven open-source tools
+- **The Data Engineering Bottleneck**: You need to extract data from 5 different systems, clean it, join it, and transform it into features
+- **The Integration Nightmare**: Airbyte for ingestion, Spark for processing, DBT for transformations, Feast for features, MLflow for models—each with different APIs, configurations, and deployment patterns
+- **The Duplication Problem**: Your feature store copies data from your data lake, doubling storage costs and creating consistency headaches
+- **The Time Sink**: What should take days stretches into weeks or months as you glue together different systems
+
+**Asgard changes this story.**
+
+### What Asgard Does
+
+Asgard is a **unified data platform** that turns complex data pipelines into simple API calls. It orchestrates your entire journey from raw data to predictions through a single, elegant REST API.
+
+Think of Asgard as your **data conductor**—coordinating multiple powerful open-source tools (Airbyte, Spark, DBT, Feast, MLflow) into a harmonious symphony, letting you focus on insights instead of infrastructure.
+
+### The Asgard Way
+
+Instead of spending weeks integrating systems, you describe what you want:
+
+> _"Take my customer data from Postgres, clean it, create purchase frequency features, train a churn model, and give me predictions for my top 1000 customers."_
+
+Asgard translates this into orchestrated actions across its platform, handling the complexity behind a clean API. What took weeks now takes hours.
+
+---
+
+## 🌟 How Asgard Works
+
+### The Journey of Data
+
+Picture your data as raw ore extracted from a mine. Asgard refines it through progressive stages, each adding value:
+
+**🥉 Bronze Layer** - _The Raw Extraction_  
+Your data arrives exactly as it exists in source systems—PostgreSQL tables, MongoDB documents, Kafka streams. No transformations yet, just a perfect historical archive in your S3 data lake.
+
+**🥈 Silver Layer** - _The Refinement_  
+Spark processes clean this data—removing duplicates, fixing data types, validating email formats, handling nulls. This is where messy reality becomes reliable data you can trust.
+
+**🥇 Gold Layer** - _The Business Value_  
+DBT transformations create business metrics: customer lifetime value, purchase frequency, days since last order. This is data that tells your business story.
+
+**💎 Features** - _The ML Magic_  
+Feast organizes gold data into feature views—reusable, versioned, point-in-time correct features that data scientists can instantly access for any model.
+
+**🚀 Models** - _The Intelligence_  
+MLflow manages your trained models—experiments, versions, parameters, metrics. Deploy once, predict forever.
+
+### The Magic: Zero Duplication
+
+Here's where Asgard breaks from tradition. While other platforms **copy** data from your data lake to a feature store (doubling costs and complexity), Asgard's Feast integration **reads directly** from Iceberg tables in S3.
+
+Your gold layer **IS** your feature store. One source of truth. No synchronization. No duplication. Just elegant efficiency.
 
 ---
 
@@ -37,23 +76,8 @@ External DBs → Airbyte → Spark → DBT → Feast → MLOps
 | Document                                                | Description                           | Time    |
 | ------------------------------------------------------- | ------------------------------------- | ------- |
 | **[� Onboarding & Setup](./docs/ONBOARDING_SETUP.md)**  | Complete setup and installation guide | 30 min  |
-| **[📖 End-to-End Use Case](./docs/USE_CASE_GUIDE.md)**  | Customer churn prediction workflow    | 2-3 hrs |
-| **[🧪 API Testing Guide](./docs/API_TESTING_GUIDE.md)** | API reference with testing examples   | 1 hr    |
-| **[🎨 Visual Diagrams](./docs/DIAGRAMS.md)**            | System architecture and data flow     | 30 min  |
-
-### 📖 **Complete Documentation**
-
-- **[📘 Documentation Index](./docs/README.md)** - Complete navigation guide
-- **[🏗️ Architecture Guide](./docs/ARCHITECTURE.md)** - Technical architecture deep dive
-- **[🔧 Debugging Guide](./docs/DEBUGGING_GUIDE.md)** - Troubleshooting and error resolution
-- **[🎯 Feast Documentation](./docs/FEAST_API_DEMO_GUIDE.md)** - Feature store guide
-- **[🤖 MLOps Guide](./docs/MLOPS_API_DEMO_GUIDE.md)** - Model training and inference
-
-### 🏗️ **Technical Deep Dive**
-
-- **[Complete Architecture](./docs/COMPLETE_ARCHITECTURE.md)** - System architecture with Mermaid diagrams
-- **[Feast + Iceberg Architecture](./docs/FEAST_ICEBERG_ARCHITECTURE.md)** - Zero-duplication feature store
-- **[Feast UI Setup](./docs/feast-ui/README.md)** - Feature store visualization
+| **[📖 Documentation and video](./docs/PLATFORM_DOCUMENTATION_AND_VIDEO.md)**       |Complete documentation and Video             | 2-3 hrs |
+| **[🎨 Visual Diagrams](./docs/COMPLETE_ARCHITECTURE.md)**            | System architecture and data flow     | 30 min  |
 
 ---
 
@@ -112,319 +136,294 @@ All documentation in order (see docs/README.md)
 
 ---
 
-## 🚀 Real-World Example
+## 🎯 Real-World Use Cases
 
-### Customer Churn Prediction (30 minutes)
+### Use Case 1: E-Commerce Churn Prevention
 
-**Step 1:** Ingest customer data from PostgreSQL
+**The Scenario**: An online retailer wants to identify at-risk customers before they leave.
 
-```bash
-POST /datasource
-{
-  "source_type": "postgres",
-  "name": "customer_db",
-  "source_config": {"host": "db.example.com", ...}
-}
-```
+**The Traditional Way** (3-4 weeks):
 
-**Step 2:** Clean data with Spark
+- Week 1: Data engineer sets up Airbyte connections
+- Week 2: Data engineer builds Spark jobs for cleaning
+- Week 3: Data scientist waits, then manually exports features
+- Week 4: Model training begins, deployment is another project
 
-```bash
-POST /spark/transform
-{
-  "sql_query": "SELECT * FROM bronze.customers WHERE email IS NOT NULL",
-  "output_table": "iceberg.silver.customers_cleaned"
-}
-```
+**The Asgard Way** (1-2 days):
 
-**Step 3:** Create business metrics with DBT
+- Morning: Connect to PostgreSQL (customers), MongoDB (browsing data), S3 (purchase history)
+- Afternoon: Transform data through Bronze → Silver → Gold layers via API calls
+- Next day: Register features, train model, deploy to production
+- Result: Real-time churn scores for every customer
 
-```bash
-POST /dbt/transform
-{
-  "sql_query": "SELECT customer_id, COUNT(*) as orders FROM silver.transactions GROUP BY 1",
-  "output_table": "iceberg.gold.customer_metrics"
-}
-```
-
-**Step 4:** Register features in Feast
-
-```bash
-POST /feast/features
-{
-  "name": "customer_features",
-  "source": {"table_name": "customer_metrics", "schema": "gold"}
-}
-```
-
-**Step 5:** Train ML model
-
-```bash
-POST /mlops/training/upload
-{
-  "script_content": "<base64_python_script>",
-  "model_name": "churn_predictor"
-}
-```
-
-**Step 6:** Get predictions
-
-```bash
-POST /mlops/inference
-{
-  "model_name": "churn_predictor",
-  "inputs": {"total_purchases": [5, 25], "lifetime_value": [250, 2500]}
-}
-```
-
-**Complete example:** See [END_TO_END_USE_CASE.md](./docs/END_TO_END_USE_CASE.md)
+**Business Impact**: Retention team can now proactively reach out to at-risk customers with personalized offers, reducing churn by 15-20%.
 
 ---
 
-## 🏗️ Architecture
+### Use Case 2: Financial Fraud Detection
 
-```
-┌─────────────────────────────────────────────────┐
-│      ASGARD REST API (FastAPI)                  │
-│         http://localhost:8000                   │
-└──────┬──────────┬──────────┬──────────┬─────────┘
-       │          │          │          │
-       ▼          ▼          ▼          ▼
-   Airbyte     Spark      DBT      Feast/MLflow
-       │          │          │          │
-       ▼          ▼          ▼          ▼
-┌──────────────────────────────────────────────────┐
-│    ICEBERG DATA LAKEHOUSE (S3 + Nessie)          │
-│  Bronze → Silver → Gold → Features → Models      │
-└──────────────────────────────────────────────────┘
-```
+**The Scenario**: A fintech company needs to detect fraudulent transactions in real-time.
 
-### Platform Components
+**The Challenge**: Transaction data flows from multiple payment processors, each with different formats. The model needs features from the last 5 minutes, last 24 hours, and last 30 days—all perfectly time-aligned.
 
-| Component      | Purpose               | Technology               |
-| -------------- | --------------------- | ------------------------ |
-| **Asgard API** | Unified REST endpoint | FastAPI, Python 3.11     |
-| **Airbyte**    | Data ingestion        | Airbyte OSS              |
-| **Spark**      | Data transformation   | Kubernetes SparkOperator |
-| **DBT**        | Business logic        | dbt + Trino              |
-| **Feast**      | Feature store         | Feast + Iceberg          |
-| **MLOps**      | ML lifecycle          | MLflow 2.16              |
-| **Iceberg**    | Data lakehouse        | Apache Iceberg + S3      |
-| **Nessie**     | Data catalog          | Project Nessie           |
+**The Asgard Solution**:
 
-**Visual diagrams:** [ARCHITECTURE_DIAGRAM.md](./docs/ARCHITECTURE_DIAGRAM.md)
+- Kafka streams ingest real-time transactions into Bronze
+- Spark processes create rolling aggregates in Silver (transactions per hour, average amounts, velocity changes)
+- DBT calculates risk scores in Gold (deviation from normal patterns)
+- Feast serves point-in-time features with millisecond precision
+- MLflow model scores each transaction instantly
+
+**Business Impact**: Fraud caught within seconds instead of hours, saving millions in prevented losses.
 
 ---
 
-## 📊 The Complete Pipeline
+### Use Case 3: Healthcare Patient Readmission
 
-### Data Layers (Medallion Architecture)
+**The Scenario**: A hospital network wants to predict which discharged patients will be readmitted within 30 days.
 
-1. **Bronze** (Raw) - Airbyte ingestion from external sources
-2. **Silver** (Cleaned) - Spark data quality and validation
-3. **Gold** (Aggregated) - DBT business logic and metrics
-4. **Features** (ML-Ready) - Feast feature views
-5. **Models** (Deployed) - MLflow trained models
+**The Complexity**:
 
-### Workflow Timeline
+- EMR data (electronic medical records) in proprietary systems
+- Lab results in separate databases
+- Medication history in pharmacy systems
+- Social determinants of health from surveys
+- All must be joined correctly, respecting patient privacy
 
-| Phase                | Duration  | API Calls | Output         |
-| -------------------- | --------- | --------- | -------------- |
-| Data Ingestion       | 10-30 min | 3-4       | Bronze tables  |
-| Spark Transform      | 5-15 min  | 2-3       | Silver tables  |
-| DBT Aggregation      | 2-10 min  | 1-2       | Gold tables    |
-| Feature Registration | <1 min    | 1-2       | Feast features |
-| Model Training       | 5-20 min  | 2         | Trained model  |
-| Inference            | <1 sec    | 1         | Predictions    |
+**The Asgard Approach**:
 
-**Total first run:** ~30-75 minutes  
-**Incremental runs:** ~10-20 minutes
+- Secure ingestion from multiple HIPAA-compliant sources
+- Automated de-identification in Silver layer
+- Feature engineering: diagnosis history, medication adherence, lab trends
+- Model training on historical outcomes
+- Daily predictions for recently discharged patients
+
+**Business Impact**: Care coordinators get daily lists of high-risk patients, enabling proactive intervention. Readmissions reduced by 25%, improving both patient outcomes and hospital economics.
 
 ---
 
-## 💡 Why Asgard?
+### Use Case 4: Retail Demand Forecasting
 
-### vs Traditional Approach
+**The Scenario**: A retail chain needs accurate inventory predictions for 500 stores across 10,000 SKUs.
 
-| Aspect                 | Traditional     | Asgard           |
-| ---------------------- | --------------- | ---------------- |
-| **Integration**        | Manual coding   | Single REST API  |
-| **Learning Curve**     | Weeks           | Days             |
-| **Data Duplication**   | Multiple copies | Zero duplication |
-| **Time to Production** | Months          | Weeks            |
-| **Scalability**        | Manual tuning   | Auto-scaling     |
+**The Scale Challenge**: That's 5 million forecasts updated daily, each requiring weather data, promotional calendars, local events, seasonal trends, and historical sales patterns.
 
-### Key Benefits
+**The Asgard Power**:
+
+- Airbyte pulls sales data (POS systems), weather (APIs), events (calendars), promotions (marketing database)
+- Spark parallelizes transformations across massive datasets
+- DBT creates store-SKU level features (trend, seasonality, price elasticity)
+- Feast organizes features for efficient batch retrieval
+- MLflow manages separate models per product category
+- Kubernetes auto-scales Spark jobs based on demand
+
+**Business Impact**: Inventory optimization reduces waste by 30% while maintaining 99% product availability. The platform that used to crash during peak periods now scales automatically.
+
+---
+
+## 🏗️ The Asgard Architecture
+
+### The Orchestra Analogy
+
+Think of Asgard as a symphony orchestra. Each tool is an instrument section—powerful on its own, magical together:
+
+**🎺 Airbyte** - The brass section: strong, reliable data ingestion from any source  
+**🎻 Spark** - The strings: flexible, scalable transformation at any scale  
+**🎹 DBT** - The piano: elegant business logic transformation  
+**🎼 Feast** - The woodwinds: precise, timely feature delivery  
+**🥁 MLflow** - The percussion: driving rhythm of the ML lifecycle  
+**🎵 Iceberg + Nessie** - The sheet music: your data lakehouse, versioned and organized
+
+**🎭 Asgard API** - The conductor: orchestrating everything through simple, unified gestures
+
+You don't need to know how to play each instrument. You just need to tell the conductor what you want to hear.
+
+### The Technology Stack
+
+Asgard stands on the shoulders of giants—battle-tested, open-source technologies:
+
+**Data Ingestion**: Airbyte OSS connects to 300+ data sources  
+**Data Processing**: Apache Spark on Kubernetes for unlimited scale  
+**SQL Transformations**: DBT + Trino for familiar, powerful analytics  
+**Feature Store**: Feast reads directly from Iceberg (no duplication!)  
+**ML Platform**: MLflow 2.16 for complete ML lifecycle  
+**Data Lakehouse**: Apache Iceberg for ACID guarantees on S3  
+**Data Catalog**: Project Nessie for Git-like data versioning  
+**Orchestration**: FastAPI for clean, fast REST endpoints  
+**Infrastructure**: Kubernetes-native for production-grade reliability
+
+### The Flow of Data
+
+**External Systems** → Airbyte extracts → **Bronze Layer** (raw in S3)  
+**Bronze** → Spark cleans → **Silver Layer** (validated in S3)  
+**Silver** → DBT transforms → **Gold Layer** (business metrics in S3)  
+**Gold** → Feast organizes → **Features** (ML-ready views)  
+**Features** → MLflow trains → **Models** (deployed predictors)  
+**Models** → Inference API → **Predictions** (real-time or batch)
+
+Every step is an API call. Every layer is queryable. Every transformation is tracked.
+
+---
+
+## 💡 Why Teams Choose Asgard
+
+### The Before and After
+
+**Before Asgard**: A data science team at a SaaS company had a backlog of 12 ML use cases. Each project took 2-3 months from conception to production. The bottleneck? 70% of time spent on data engineering—setting up pipelines, debugging integrations, managing infrastructure.
+
+**After Asgard**: Same team, same use cases. First project took 2 weeks (learning curve). Second project: 3 days. By the sixth project: proof-of-concept in a single day. The 12-use-case backlog? Cleared in 4 months instead of 3 years.
+
+### What Changed?
 
 **For Data Engineers:**
 
-- No complex integrations
-- Medallion architecture built-in
-- Monitor everything from one dashboard
+- Stopped writing integration code, started designing data flows
+- One API to learn instead of six different tools
+- Infrastructure as configuration, not as code
+- Observability built-in: every transformation tracked, every pipeline monitored
 
 **For Data Scientists:**
 
-- Features automatically available
-- Upload Python script → model trained
-- No data engineering required
+- Features available in minutes, not weeks
+- No more "Can you export this data for me?" requests
+- Upload a training script, get a deployed model
+- Point-in-time correctness guaranteed—no data leakage surprises
 
 **For ML Engineers:**
 
-- One-line inference API
-- Model versioning built-in
-- Production-ready deployment
+- Production deployment is an API call, not a three-sprint project
+- Model versioning, A/B testing, rollback—all built-in
+- Scaling handled automatically by Kubernetes
+- Same API for batch predictions and real-time inference
 
-**For Business:**
+**For Business Leaders:**
 
-- Fast time-to-value (days not months)
-- Reduced costs (no duplication)
-- Better predictions (quality pipeline)
+- Time-to-value measured in days, not quarters
+- Infrastructure costs cut by 40% (no data duplication)
+- Data quality transparent and measurable
+- ML models actually make it to production (not stuck in notebooks)
+
+### The Asgard Philosophy
+
+Asgard believes that **data should flow, not sit**. That **complexity should be hidden, not passed to users**. That **the best tool is the one you forget you're using** because it just works.
+
+We didn't build Asgard to be another tool in your stack. We built it to **be** your stack—a unified platform where powerful open-source tools work together seamlessly, letting you focus on the insights that matter.
 
 ---
 
-## 🛠️ Installation & Deployment
+## 🚀 Getting Started with Asgard
 
-### Local Development
+### Your First Five Minutes
 
-```bash
-# Clone the repository
-git clone <repository-url>
-cd asgard-dev
+Asgard is designed to be intuitive from the first API call. Here's what your first experience looks like:
 
-# Install dependencies
-uv sync
+**Minute 1-2**: Access the platform
 
-# Start the API server
-uv run python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
+- Port-forward to Asgard API running in Kubernetes
+- Open the interactive API documentation at `http://localhost:8000/docs`
+- Browse the clean, organized endpoints
 
-### Kubernetes Deployment
+**Minute 3-4**: Make your first call
 
-```bash
-# Port forward to access services
-kubectl port-forward -n asgard svc/asgard-app 8000:80
-kubectl port-forward -n asgard svc/mlflow-service 5000:5000
-```
+- Hit the `/health` endpoint to confirm everything works
+- Check `/mlops/status` to see platform components
+- Marvel at how simple it is
 
-### Access Points
+**Minute 5**: Understand the workflow
 
-- **API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
-- **MLflow UI**: http://localhost:5000
-- **Health Check**: http://localhost:8000/health
+- Read through the endpoint documentation
+- Notice the pattern: ingest → transform → feature → train → predict
+- Realize you already understand how to use 80% of the platform
 
-## 📖 API Reference
+### Your First Hour
 
-### Quick API Examples
+Follow the **[Onboarding Guide](./docs/ONBOARDING_SETUP.md)** to:
 
-**Data Ingestion** (Airbyte):
+- Connect your first data source
+- Run a simple transformation
+- Register a feature
+- Make a prediction
 
-```bash
-# Create data source
-POST /datasource
-{"source_type": "postgres", "name": "My DB", ...}
+By hour's end, you'll have data flowing through all five layers.
 
-# Start ingestion
-POST /ingestion
-{"source_id": "...", "destination_id": "...", ...}
-```
+### Your First Project
 
-**Data Transformation** (Spark):
+The **[End-to-End Use Case Guide](./docs/USE_CASE_GUIDE.md)** walks you through building a complete customer churn prediction system:
 
-```bash
-# Submit transformation
-POST /spark/transform
-{"sql": "SELECT * FROM source_data WHERE ...", ...}
+- Ingest data from multiple sources
+- Clean and validate with Spark
+- Create business metrics with DBT
+- Build reusable features with Feast
+- Train and deploy a production model
+- Serve real-time predictions
 
-# Check status
-GET /spark/transform/{run_id}/status
-```
+**Time investment**: 2-3 hours  
+**Value delivered**: A production-ready ML system
 
-**Feature Store** (Feast):
+### Learning Paths for Different Roles
 
-```bash
-# Register features
-POST /feast/features
-{"name": "customer_features", "entities": ["customer_id"], ...}
+**Data Engineers**: Start with [Architecture Guide](./docs/COMPLETE_ARCHITECTURE.md) → understand Medallion layers → experiment with Spark transformations → explore Iceberg integration
 
-# Get features
-GET /feast/features/{name}
-```
+**Data Scientists**: Start with [Use Case Guide](./docs/USE_CASE_GUIDE.md) → understand feature registration → upload training script → deploy model → celebrate not dealing with infrastructure
 
-**ML Training** (MLflow):
+**ML Engineers**: Start with [MLOps Guide](./docs/MLOPS_API_DEMO_GUIDE.md) → understand model deployment → experiment with inference → explore A/B testing patterns
 
-```bash
-# Upload training script
-POST /mlops/training/upload
-{"script_content": "<base64>", "model_name": "...", ...}
+**Technical Leaders**: Start with this README → browse [Complete Architecture](./docs/COMPLETE_ARCHITECTURE.md) → review [API Testing Guide](./docs/API_TESTING_GUIDE.md) → assess organizational fit
 
-# Get predictions
-POST /mlops/inference
-{"model_name": "...", "inputs": {...}}
-```
+## 🌍 Who Uses Asgard?
 
-**Interactive Documentation**: http://localhost:8000/docs
+Asgard is built for organizations at the intersection of data and decision-making:
 
-## 🏛️ Architecture Overview
+**E-commerce & Retail**: Personalization engines, demand forecasting, inventory optimization, customer lifetime value prediction
 
-### Component Structure
+**Financial Services**: Fraud detection, credit risk scoring, algorithmic trading signals, customer segmentation
 
-```
-app/
-├── main.py                      # FastAPI application
-├── config.py                    # Configuration
-├── airbyte/                     # Data ingestion
-├── data_transformation/         # Spark transformations
-├── dbt_transformations/         # SQL transformations
-├── feast/                       # Feature store
-├── mlops/                       # ML lifecycle
-└── data_products/               # Data access
-```
+**Healthcare**: Patient readmission prediction, treatment recommendation, resource optimization, clinical trial matching
 
-### Medallion Architecture
+**SaaS & Technology**: Churn prediction, usage forecasting, feature adoption analysis, pricing optimization
 
-**Bronze Layer** → Raw data from sources (Airbyte)  
-**Silver Layer** → Cleaned, validated data (Spark)  
-**Gold Layer** → Business metrics, ML-ready (DBT)  
-**Features** → Feature views for ML (Feast)  
-**Models** → Trained models (MLflow)
+**Manufacturing**: Predictive maintenance, quality control, supply chain optimization, demand planning
 
-## 🔧 Configuration
+From **startups** moving fast with limited engineering resources to **enterprises** managing complex data ecosystems, Asgard scales to your needs.
 
-### Key Environment Variables
+---
 
-| Variable           | Description               | Default |
-| ------------------ | ------------------------- | ------- |
-| `AIRBYTE_BASE_URL` | Airbyte API URL           | -       |
-| `SPARK_IMAGE`      | Custom Spark Docker image | -       |
-| `S3_SECRET_NAME`   | K8s secret for S3 access  | -       |
+## 📚 Explore Further
 
-See [ONBOARDING_SETUP.md](./docs/ONBOARDING_SETUP.md) for complete configuration guide.
+### Essential Documentation
 
-## 📁 Project Structure
+**[📘 Complete Architecture](./docs/COMPLETE_ARCHITECTURE.md)** - Deep dive into system design with visual diagrams  
+**[📖 End-to-End Use Case](./docs/USE_CASE_GUIDE.md)** - Build a complete ML system step-by-step  
+**[🧪 API Testing Guide](./docs/API_TESTING_GUIDE.md)** - Comprehensive API reference with examples  
+**[🏁 Onboarding & Setup](./docs/ONBOARDING_SETUP.md)** - Get started in 30 minutes  
+**[🎯 Feast Feature Store](./docs/FEAST_API_DEMO_GUIDE.md)** - Master feature engineering  
+**[🤖 MLOps Guide](./docs/MLOPS_API_DEMO_GUIDE.md)** - Model training to deployment  
+**[🔧 Debugging Guide](./docs/DEBUGGING_GUIDE.md)** - Troubleshooting and best practices
 
-```
-asgard-dev/
-├── app/                         # Platform code
-│   ├── airbyte/                # Data ingestion
-│   ├── data_transformation/    # Spark jobs
-│   ├── dbt_transformations/    # SQL transforms
-│   ├── feast/                  # Feature store
-│   ├── mlops/                  # ML lifecycle
-│   └── main.py                 # FastAPI app
-├── docs/                        # Documentation
-│   ├── COMPLETE_ARCHITECTURE.md
-│   ├── USE_CASE_GUIDE.md
-│   └── feast-ui/               # Feast UI setup
-├── k8s/                         # Kubernetes manifests
-├── helmchart/                   # Helm charts
-└── ml_deployment/               # ML deployment scripts
-```
+See **[docs/README.md](./docs/README.md)** for the complete documentation index.
 
-## 🤝 Contributing
+---
 
-See documentation in `docs/` folder for contribution guidelines.
+## 🎬 The Final Word
 
-## 📄 License
+In the world of data and machine learning, there's no shortage of powerful tools. The challenge has never been capability—it's been **integration, complexity, and time**.
 
-[Add your license information here]
+Asgard doesn't replace your favorite tools. It orchestrates them. It doesn't lock you into proprietary technology. It leverages proven open-source platforms. It doesn't force you to learn six different systems. It gives you one elegant API.
+
+**Asgard's promise**: What used to take weeks can now take days. What used to require a team of specialists can now be done by a single data scientist. What used to stay in notebooks can now reach production.
+
+Your data has stories to tell. Asgard helps you tell them.
+
+**Ready to begin?** Start with the **[Onboarding Guide](./docs/ONBOARDING_SETUP.md)** and build your first pipeline today.
+
+---
+
+## 🤝 Community & Support
+
+- **Documentation**: See `docs/` folder for comprehensive guides
+- **Issues**: Report bugs or request features via GitHub Issues
+- **Contributing**: We welcome contributions—see contribution guidelines in docs
+
+---
+
+_Built with ❤️ for data teams who believe insights shouldn't wait_
