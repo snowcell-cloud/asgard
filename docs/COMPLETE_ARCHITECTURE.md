@@ -152,12 +152,14 @@ flowchart TB
     end
 
     subgraph API["API Layer - FastAPI Gateway"]
-        Router_Airbyte["/datasource\n/datasink\n/ingestion"]
-        Router_Spark["/spark/transform"]
-        Router_DBT["/dbt/transform"]
-        Router_Feast["/feast/features\n/feast/status"]
-        Router_MLOps["/mlops/training\n/mlops/inference"]
-    end    subgraph Platform["Platform Components"]
+        Router_Airbyte["datasource / datasink / ingestion"]
+        Router_Spark["spark transform"]
+        Router_DBT["dbt transform"]
+        Router_Feast["feast features / status"]
+        Router_MLOps["mlops training / inference"]
+    end
+
+    subgraph Platform["Platform Components"]
         direction TB
 
         subgraph Airbyte_System["Airbyte Platform"]
@@ -442,7 +444,7 @@ Source DB → Airbyte Connector → Normalization → S3/Iceberg (Bronze)
 
 **Purpose**: Distributed data processing (Bronze → Silver)
 
-````mermaid
+```mermaid
 flowchart TB
     subgraph API["API Request"]
         Request["POST /spark/transform\njob_name, sql_query, output_table"]
@@ -680,14 +682,14 @@ flowchart TB
 
 **Model Lifecycle**:
 
-````
+```
 
 Training Script → MLflow Tracking → Model Registry → Model Serving
 │ │ │ │
 ↓ ↓ ↓ ↓
 Upload Log metrics Version model Inference API
 
-````
+```
 
 ---
 
@@ -736,7 +738,7 @@ flowchart LR
     class Bronze,B1,B2,B3,B4 bronzeStyle
     class Silver,S1,S2,S3,S4 silverStyle
     class Gold,G1,G2,G3,G4 goldStyle
-````
+```
 
 ### S3 Storage Structure
 
