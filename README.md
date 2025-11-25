@@ -109,32 +109,8 @@ open http://localhost:8000/docs
 ### Access Points
 
 - **Asgard API:** http://localhost:8000/docs (Swagger UI)
-- **MLflow UI:** http://localhost:5000 (Experiment tracking)
-
 ---
-
-## 🎓 Learning Paths
-
-### Path 1: Quick Start (30 minutes)
-
-```
-Quick Reference Guide → Try one API call → Read Use Case Phase 1
-```
-
-### Path 2: Complete Understanding (2 hours)
-
-```
-Quick Reference → Architecture Diagrams → End-to-End Use Case
-→ Feast Demo → MLOps Demo
-```
-
-### Path 3: Deep Technical Dive (4 hours)
-
-```
-All documentation in order (see docs/README.md)
-```
-
----
+ 
 
 ## 🎯 Real-World Use Cases
 
@@ -303,7 +279,7 @@ Every step is an API call. Every layer is queryable. Every transformation is tra
 - Data quality transparent and measurable
 - ML models actually make it to production (not stuck in notebooks)
 
-### The Asgard Philosophy
+### The Asgard  
 
 Asgard believes that **data should flow, not sit**. That **complexity should be hidden, not passed to users**. That **the best tool is the one you forget you're using** because it just works.
 
