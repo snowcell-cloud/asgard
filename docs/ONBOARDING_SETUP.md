@@ -1,9 +1,8 @@
 # Asgard Platform - Onboarding & Setup Guide
 
 **Complete Setup Instructions**  
-**Last Updated:** November 11, 2025  
-**Version:** 1.0  
-
+**Last Updated:** November 25, 2025  
+**Version:** 1.1
 
 ---
 
@@ -11,281 +10,256 @@
 
 1. [What is Asgard?](#what-is-asgard)
 2. [Prerequisites](#prerequisites)
-3. [Quick Start  ](#quick-start-5-minutes)
+3. [Quick Start](#quick-start)
 4. [Complete Installation](#complete-installation)
-5. [Initial Configuration](#initial-configuration)
+5. [Configuration](#configuration)
 6. [Verify Installation](#verify-installation)
-7. [First Steps](#first-steps)
+7. [CI/CD Workflows](#cicd-workflows)
 8. [Next Steps](#next-steps)
 
---- 
+---
 
-## What is Asgard?
+**Key Capabilities:**
 
-**Asgard** is a unified data platform that orchestrates the complete data lifecycle from raw data ingestion to ML model deployment through a **single REST API**.
-
-### One-Sentence Summary
-
-> "FastAPI-powered data lakehouse that orchestrates Airbyte, Spark, DBT, Feast, and MLflow for end-to-end ML workflows on Kubernetes."
-
-### The Complete Pipeline
-
-```
-External DBs → Airbyte → Spark → DBT → Feast → MLOps
-    ↓           ↓         ↓       ↓      ↓       ↓
- Sources     Bronze    Silver   Gold  Features Models
-```
-
-### What You'll Get
-
-✅ **Data Ingestion** - Connect to PostgreSQL, MySQL, APIs (Airbyte)  
-✅ **Data Processing** - Clean and transform data (Spark on Kubernetes)  
-✅ **Business Analytics** - SQL-based transformations (DBT + Trino)  
-✅ **Feature Engineering** - ML-ready features (Feast + Iceberg)  
-✅ **ML Training** - Train models with MLflow tracking  
-✅ **Model Serving** - Deploy models for real-time inference  
-✅ **Data Lakehouse** - Apache Iceberg on S3 with Nessie catalog
+- Data ingestion via Airbyte
+- Data processing with Spark on Kubernetes
+- SQL transformations using DBT + Trino
+- Feature engineering with Feast + Iceberg
+- ML training and deployment with MLflow
+- Unified REST API built with FastAPI
 
 ---
 
 ## Prerequisites
 
-### Required Tools
+### Required
 
-| Tool           | Version | Purpose                 | Installation                                               |
-| -------------- | ------- | ----------------------- | ---------------------------------------------------------- |
-| **Kubernetes** | 1.27+   | Container orchestration | [Install kubectl](https://kubernetes.io/docs/tasks/tools/) |
-| **Helm**       | 3.0+    | Package manager         | [Install Helm](https://helm.sh/docs/intro/install/)        |
-| **Docker**     | 20.10+  | Container runtime       | [Install Docker](https://docs.docker.com/get-docker/)      |
-| **Python**     | 3.11+   | Client scripts          | [Install Python](https://www.python.org/downloads/)        |
-| **curl**       | Latest  | API testing             | Pre-installed on most systems                             
+| Tool        | Version | Purpose         |
+| ----------- | ------- | --------------- |
+| **kubectl** | 1.27+   | Kubernetes CLI  |
+| **Helm**    | 3.0+    | Package manager |
+| **Python**  | 3.11+   | Development     |
+| **curl**    | Any     | API testing     |
 
+### Cluster Requirements
 
-### Cloud Resources (Optional)
-
-| Resource               | Purpose             | Provider                           |
-| ---------------------- | ------------------- | ---------------------------------- |
-| **S3 Bucket**          | Artifact storage    | AWS, MinIO, or compatible          |
-| **PostgreSQL**         | Metadata storage    | AWS RDS, Cloud SQL, or self-hosted |
-| **Kubernetes Cluster** | Platform deployment | EKS, GKE, AKS, or minikube         |
-
-### Access Requirements
-
-- Kubernetes cluster admin access (for installation)
+- Kubernetes cluster with admin access
 - Namespace creation permissions
-- Port-forwarding capabilities (for local access)
-- AWS credentials (if using S3)
+- S3-compatible storage (AWS S3 or MinIO)
+- PostgreSQL database (for MLflow metadata)
 
 ---
 
-## Quick Start (5 Minutes)
+## Quick Start
 
-### Step 1: Clone the Repository
+### 1. Clone Repository
 
 ```bash
-# Clone Asgard repository
 git clone https://github.com/your-org/asgard.git
 cd asgard
 ```
 
-### Step 2: Deploy to Kubernetes
+### 2. Create Namespace
 
 ```bash
-# Create namespace
-kubectl create namespace asgard
-
-# Deploy Asgard using Helm
-helm install asgard ./helmchart \
-  --namespace asgard \
-  --set image.repository=your-registry/asgard \
-  --set image.tag=latest
+kubectl apply -f k8s/namespace.yaml
 ```
 
-### Step 3: Port Forward API
+### 3. Deploy Asgard
+
+Using the Helm chart with default values:
 
 ```bash
-# Forward Asgard API to local machine
+helm install asgard ./helmchart --namespace asgard
+```
+
+### 4. Access the API
+
+```bash
+# Port forward the service
 kubectl port-forward -n asgard svc/asgard-app 8000:80
-```
-
-### Step 4: Verify Installation
-
-```bash
-# Check API health
-curl http://localhost:8000/health
 
 # Access Swagger UI
 open http://localhost:8000/docs
 ```
 
-**Expected Response:**
-
-```json
-{
-  "status": "healthy",
-  "version": "1.0.0",
-  "services": {
-    "airbyte": "connected",
-    "spark": "ready",
-    "dbt": "ready",
-    "feast": "connected",
-    "mlflow": "connected"
-  }
-}
-```
-
-✅ **You're ready!** Continue to [First Steps](#first-steps)
+✅ **Installation complete!** Your Asgard platform is now running.
 
 ---
 
 ## Complete Installation
 
-### 1. Deploy Infrastructure Components
+### Step 1: Deploy Kubernetes Resources
 
-#### Deploy MLflow
+#### Create Namespace and RBAC
 
 ```bash
-# Deploy MLflow tracking server
+# Create the asgard namespace
+kubectl apply -f k8s/namespace.yaml
+
+# Create Spark RBAC permissions
+kubectl apply -f k8s/spark-rbac.yaml
+```
+
+#### Deploy MLflow (Optional)
+
+If you need MLflow tracking:
+
+```bash
+# Deploy in order
 kubectl apply -f mlflow/postgres.yaml
 kubectl apply -f mlflow/storage.yaml
 kubectl apply -f mlflow/mlflow-deployment.yaml
 kubectl apply -f mlflow/mlflow-service.yaml
 kubectl apply -f mlflow/mlflow-ingress.yaml
 
-# Wait for MLflow to be ready
-kubectl wait -n asgard --for=condition=ready pod -l app=mlflow --timeout=300s
+# Verify MLflow is running
+kubectl get pods -n asgard -l app=mlflow
 ```
+
+### Step 2: Configure Secrets
+
+#### AWS/S3 Credentials
+
+```bash
+# Create S3 credentials secret
+kubectl create secret generic s3-credentials \
+  --namespace asgard \
+  --from-literal=AWS_ACCESS_KEY_ID=your-access-key \
+  --from-literal=AWS_SECRET_ACCESS_KEY=your-secret-key \
+  --from-literal=AWS_REGION=us-east-1
+```
+
+#### ECR Authentication (if using AWS ECR)
+
+```bash
+# Create ECR secret for pulling images
+kubectl apply -f k8s/ecr-auto-refresh-cronjob.yaml
+```
+
+### Step 3: Deploy Asgard Application
+
+#### Using Helm Chart
+
+Edit `helmchart/values.yaml` or override values:
+
+```bash
+helm install asgard ./helmchart \
+  --namespace asgard \
+  --set image.repository=637423187518.dkr.ecr.eu-north-1.amazonaws.com/asgard \
+  --set image.tag=latest \
+  --set env.SPARK_IMAGE=637423187518.dkr.ecr.eu-north-1.amazonaws.com/spark-custom:latest
+```
+
+#### Using Custom Values File
+
+Create a custom `my-values.yaml`:
+
+```yaml
+image:
+  repository: your-registry/asgard
+  tag: latest
+
+env:
+  AIRBYTE_BASE_URL: "http://airbyte-server:8001/api/public/v1"
+  TRINO_HOST: "trino.data-platform.svc.cluster.local"
+  NESSIE_URI: "http://nessie.data-platform.svc.cluster.local:19120/api/v1"
+```
+
+<!--
+Deploy with custom values:
+
+```bash
+helm install asgard ./helmchart -f my-values.yaml --namespace asgard
+```
+
+### Step 4: Set Up External Dependencies
 
 #### Deploy Airbyte (Optional)
 
 ```bash
-# Add Airbyte Helm repo
 helm repo add airbyte https://airbytehq.github.io/helm-charts
 helm repo update
-
-# Install Airbyte
-helm install airbyte airbyte/airbyte \
-  --namespace asgard \
-  --set global.edition=community
+helm install airbyte airbyte/airbyte --namespace airbyte --create-namespace
 ```
 
 #### Deploy Spark Operator
 
 ```bash
-# Add Spark Operator Helm repo
 helm repo add spark-operator https://googlecloudplatform.github.io/spark-on-k8s-operator
-helm repo update
-
-# Install Spark Operator
 helm install spark-operator spark-operator/spark-operator \
   --namespace asgard \
   --set sparkJobNamespace=asgard
-```
-
-### 2. Configure AWS Credentials (If Using S3)
-
-```bash
-# Create AWS credentials secret
-kubectl create secret generic aws-credentials \
-  --namespace asgard \
-  --from-literal=AWS_ACCESS_KEY_ID=your-access-key \
-  --from-literal=AWS_SECRET_ACCESS_KEY=your-secret-key \
-  --from-literal=AWS_DEFAULT_REGION=us-east-1
-
-# Apply ECR credentials (if using ECR)
-kubectl apply -f k8s/ecr-credentials.yaml
-```
-
-### 3. Deploy Asgard Application
-
-```bash
-# Deploy using Helm
-helm install asgard ./helmchart \
-  --namespace asgard \
-  --set image.repository=your-registry/asgard \
-  --set image.tag=latest \
-  --set env.AWS_S3_BUCKET=your-bucket-name \
-  --set env.MLFLOW_TRACKING_URI=http://mlflow-service:5000
-
-# Verify deployment
-kubectl get pods -n asgard
-```
-
-### 4. Set Up Port Forwarding
-
-```bash
-# Forward Asgard API
-kubectl port-forward -n asgard svc/asgard-app 8000:80 &
-
-# Forward MLflow UI
-kubectl port-forward -n asgard svc/mlflow-service 5000:5000 &
-
-# Forward Airbyte UI (if deployed)
-kubectl port-forward -n asgard svc/airbyte-webapp-svc 8001:80 &
-```
+``` -->
 
 ---
 
-## Initial Configuration
+## Configuration
 
-### 1. Configure Environment Variables
+### Environment Variables Reference
 
-Create a `.env` file or set environment variables:
+The application is configured via `helmchart/values.yaml`. Key environment variables:
 
-```bash
-# API Configuration
-export ASGARD_API_URL=http://localhost:8000
+```yaml
+env:
+  # Core Settings
+  ENVIRONMENT: "production"
+  PIPELINE_NAMESPACE: "asgard"
+  SPARK_NAMESPACE: "asgard"
 
-# AWS Configuration
-export AWS_S3_BUCKET=your-bucket-name
-export AWS_ACCESS_KEY_ID=your-access-key
-export AWS_SECRET_ACCESS_KEY=your-secret-key
-export AWS_DEFAULT_REGION=us-east-1
+  # Airbyte Integration
+  AIRBYTE_BASE_URL: "http://airbyte-server:8001/api/public/v1"
 
-# MLflow Configuration
-export MLFLOW_TRACKING_URI=http://localhost:5000
+  # Spark Configuration
+  SPARK_IMAGE: "your-registry/spark-custom:latest"
+  SPARK_SERVICE_ACCOUNT: "spark-sa"
+  S3_SECRET_NAME: "s3-credentials"
 
-# Airbyte Configuration (optional)
-export AIRBYTE_API_URL=http://localhost:8001/api/v1
+  # Trino/Iceberg
+  TRINO_HOST: "trino.data-platform.svc.cluster.local"
+  TRINO_PORT: "8080"
+  TRINO_CATALOG: "iceberg"
+
+  # Nessie Catalog
+  NESSIE_URI: "http://nessie:19120/api/v1"
+  NESSIE_REF: "main"
+
+  # Feast Feature Store
+  FEAST_REPO_PATH: "/tmp/feast_repo"
+
+  # Storage Paths
+  MODEL_STORAGE_PATH: "/tmp/models"
+  DBT_PROJECT_DIR: "/tmp/dbt_projects"
 ```
 
-### 2. Initialize Feast Repository
+### Local Development Setup
+
+For local development, copy `.env.example` to `.env`:
 
 ```bash
-# The Feast repository is auto-configured in the Asgard deployment
-# Verify it's working
-curl http://localhost:8000/feast/status
+cp .env.example .env
 ```
 
-### 3. Configure Iceberg Catalog
+Edit `.env` with your settings:
 
 ```bash
-# Nessie catalog is pre-configured
-# Verify connectivity
-curl http://localhost:8000/data-products/status
+ENVIRONMENT=development
+AIRBYTE_BASE_URL=http://localhost:8001/api/public/v1
+AWS_ACCESS_KEY_ID=your-key
+AWS_SECRET_ACCESS_KEY=your-secret
+AWS_REGION=us-east-1
+SPARK_IMAGE=your-registry/spark-custom:latest
 ```
+
+### Service Accounts
+
+The deployment creates a service account `asgard-app` for the API and `spark-sa` for Spark jobs (configured in `k8s/spark-rbac.yaml`)
 
 ---
 
 ## Verify Installation
 
-### 1. Check All Services
-
-```bash
-# Check Asgard API
-curl http://localhost:8000/health | jq
-
-# Check MLflow
-curl http://localhost:5000/health | jq
-
-# Check Feast status
-curl http://localhost:8000/feast/status | jq
-
-# Check Airbyte (if deployed)
-curl http://localhost:8001/api/v1/health | jq
-```
-
-### 2. Check Kubernetes Resources
+### Check Deployment Status
 
 ```bash
 # Check all pods are running
@@ -294,26 +268,299 @@ kubectl get pods -n asgard
 # Expected output:
 # NAME                          READY   STATUS    RESTARTS   AGE
 # asgard-app-xxxxxxxxxx-xxxxx   1/1     Running   0          5m
-# mlflow-xxxxxxxxxx-xxxxx       1/1     Running   0          10m
-# postgres-xxxxxxxxxx-xxxxx     1/1     Running   0          10m
-# spark-operator-xxxxx          1/1     Running   0          10m
+```
 
-# Check services
+### Check Services
+
+```bash
+# List all services
 kubectl get svc -n asgard
 
-# Check ingresses
+# Expected services:
+# NAME          TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)
+# asgard-app    LoadBalancer   10.100.x.x      <pending>     80:xxxxx/TCP
+```
+
+### Check Ingress (if enabled)
+
+```bash
 kubectl get ingress -n asgard
 ```
 
-### 3. Access Web UIs
+### Test API Health
 
-| Service             | URL                          | Purpose                                |
-| ------------------- | ---------------------------- | -------------------------------------- |
-| **Asgard API Docs** | http://localhost:8000/docs   | Interactive API documentation          |
-| **MLflow UI**       | http://localhost:5000        | Experiment tracking and model registry |
-| **Airbyte UI**      | http://localhost:8001        | Data connector configuration           |
-| **Health Check**    | http://localhost:8000/health | Platform status                        |
+```bash
+# Port forward first
+kubectl port-forward -n asgard svc/asgard-app 8000:80
+
+# Check health endpoint
+curl http://localhost:8000/health
+
+# Access interactive API docs
+open http://localhost:8000/docs
+```
+
+### Access MLflow (if deployed)
+
+```bash
+# Port forward MLflow
+kubectl port-forward -n asgard svc/mlflow-service 5000:5000
+
+# Access MLflow UI
+open http://localhost:5000
+```
 
 ---
- 
-   
+
+## Next Steps
+
+### 1. Explore the API
+
+Open the interactive API documentation:
+
+```bash
+open http://localhost:8000/docs
+```
+
+Key endpoints to try:
+
+- `GET /health` - Check platform status
+- `GET /airbyte/connections` - List data connections
+- `GET /feast/feature-views` - List feature views
+
+### 2. Run Your First Pipeline
+
+See the [Platform Documentation](./PLATFORM_DOCUMENTATION_AND_VIDEO.md) for complete examples.
+
+### 3. Learn the Architecture
+
+Review [Complete Architecture](./COMPLETE_ARCHITECTURE.md) for system diagrams and data flow.
+
+### 4. Configure Integrations
+
+- **Airbyte**: Set up data source connections
+- **Spark**: Configure processing jobs
+- **DBT**: Create SQL transformations
+- **Feast**: Define feature views
+- **MLflow**: Track experiments
+
+---
+
+## Troubleshooting
+
+### Pod Not Starting
+
+```bash
+# Check pod logs
+kubectl logs -n asgard deployment/asgard-app
+
+# Describe pod for events
+kubectl describe pod -n asgard -l app=asgard-app
+```
+
+### Image Pull Errors
+
+If using ECR, ensure the secret is created:
+
+```bash
+kubectl get secret -n asgard ecr-secret
+```
+
+### Service Connection Issues
+
+Check that dependent services are accessible:
+
+```bash
+# Test Trino connection
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never \
+  -- curl http://trino.data-platform.svc.cluster.local:8080
+
+# Test Nessie connection
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never \
+  -- curl http://nessie.data-platform.svc.cluster.local:19120/api/v1
+```
+
+### Check Helm Release
+
+```bash
+# List Helm releases
+helm list -n asgard
+
+# Check release status
+helm status asgard -n asgard
+
+# View release values
+helm get values asgard -n asgard
+```
+
+---
+
+## Upgrade
+
+To upgrade an existing installation:
+
+```bash
+# Pull latest changes
+git pull origin main
+
+# Upgrade Helm release
+helm upgrade asgard ./helmchart -n asgard
+```
+
+To upgrade with new values:
+
+```bash
+helm upgrade asgard ./helmchart -n asgard -f my-values.yaml
+```
+
+---
+
+## Uninstall
+
+To completely remove Asgard:
+
+```bash
+# Uninstall Helm release
+helm uninstall asgard -n asgard
+
+# Delete namespace (WARNING: This deletes all data)
+kubectl delete namespace asgard
+```
+
+---
+
+## CI/CD Workflows
+
+Asgard includes two automated GitHub Actions workflows for building and deploying the platform.
+
+### 1. Main Application Deployment (`deploy.yml`)
+
+**Workflow:** `.github/workflows/deploy.yml`
+
+**Trigger:** Automatically runs on push to `dev` branch
+
+**What it does:**
+
+1. Builds the Asgard FastAPI application Docker image
+2. Pushes image to AWS ECR (`637423187518.dkr.ecr.eu-north-1.amazonaws.com/asgard:latest`)
+3. Deploys to Kubernetes cluster using Helm
+4. Upgrades the `asgard-app` release in the `asgard` namespace
+
+**Required GitHub Secrets:**
+
+- `AWS_ACCESS_KEY_ID` - AWS credentials for ECR access
+- `AWS_SECRET_ACCESS_KEY` - AWS secret key
+- `KUBECONFIG` - Kubernetes cluster configuration (base64 encoded or plain text)
+
+**Usage:**
+
+```bash
+# Push to dev branch to trigger deployment
+git push origin dev
+```
+
+### 2. Spark Image Builder (`build-spark-image.yml`)
+
+**Workflow:** `.github/workflows/build-spark-image.yml`
+
+**Trigger:**
+
+- Push to `dev` branch when these files change:
+  - `spark.Dockerfile`
+  - `.github/workflows/build-spark-image.yml`
+  - `sql_transform_embedded.py`
+- Manual trigger via `workflow_dispatch`
+
+**What it does:**
+
+1. Builds custom Spark image with S3 support from `spark.Dockerfile`
+2. Runs comprehensive tests:
+   - Spark installation verification
+   - Python and PySpark import tests
+   - S3A dependencies check
+   - AWS CLI verification
+3. Pushes image to ECR (`637423187518.dkr.ecr.eu-north-1.amazonaws.com/spark-custom`)
+4. Updates deployment files with new image tag
+5. Runs security scan on the image
+
+**Required GitHub Secrets:**
+
+- `AWS_ACCESS_KEY_ID` - AWS credentials for ECR access
+- `AWS_SECRET_ACCESS_KEY` - AWS secret key
+
+**Usage:**
+
+```bash
+# Automatic trigger on file changes
+git add spark.Dockerfile
+git commit -m "Update Spark configuration"
+git push origin dev
+
+# Or trigger manually from GitHub Actions UI
+# Go to Actions → Build and Push Spark S3 Image to ECR → Run workflow
+```
+
+**Manual Workflow Trigger:**
+You can also trigger the Spark image build manually without pushing code:
+
+```bash
+# Using GitHub CLI
+gh workflow run build-spark-image.yml
+```
+
+### Setting Up Workflows
+
+To use these workflows in your fork:
+
+1. **Configure AWS Credentials:**
+
+   ```bash
+   # In your GitHub repository settings → Secrets and variables → Actions
+   # Add the following secrets:
+   AWS_ACCESS_KEY_ID=your-access-key
+   AWS_SECRET_ACCESS_KEY=your-secret-key
+   KUBECONFIG=your-kubeconfig-content
+   ```
+
+2. **Update ECR Registry:**
+   If using a different AWS account, update the ECR registry in both workflow files:
+
+   ```yaml
+   env:
+     ECR_REGISTRY: your-account-id.dkr.ecr.your-region.amazonaws.com
+   ```
+
+3. **Test Workflows:**
+
+   ```bash
+   # Push to dev branch
+   git checkout dev
+   git push origin dev
+
+   # Monitor workflow execution
+   gh run list --workflow=deploy.yml
+   gh run list --workflow=build-spark-image.yml
+   ```
+
+### Workflow Benefits
+
+- ✅ **Automated Builds** - No manual Docker builds required
+- ✅ **Continuous Deployment** - Push code and it deploys automatically
+- ✅ **Image Testing** - Spark image is tested before deployment
+- ✅ **Security Scanning** - Automatic vulnerability scanning
+- ✅ **Version Tracking** - Images tagged with Git commit SHA
+- ✅ **Zero Downtime** - Helm upgrade ensures smooth deployments
+
+---
+
+## Additional Resources
+
+- **[Complete Documentation](./PLATFORM_DOCUMENTATION_AND_VIDEO.md)** - Full platform guide with examples
+- **[Architecture Diagrams](./COMPLETE_ARCHITECTURE.md)** - Visual system architecture
+- **[API Reference](http://localhost:8000/docs)** - Interactive API documentation
+- **[GitHub Repository](https://github.com/snowcell-cloud/asgard-dev)** - Source code and issues
+
+---
+
+**Questions or Issues?**  
+Open an issue on GitHub or contact the platform team.
