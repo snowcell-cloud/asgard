@@ -3,20 +3,6 @@
 **Complete Setup Instructions**  
 **Last Updated:** November 25, 2025  
 **Version:** 1.1
-
----
-
-## 📋 Table of Contents
-
-1. [What is Asgard?](#what-is-asgard)
-2. [Prerequisites](#prerequisites)
-3. [Quick Start](#quick-start)
-4. [Complete Installation](#complete-installation)
-5. [Configuration](#configuration)
-6. [Verify Installation](#verify-installation)
-7. [CI/CD Workflows](#cicd-workflows)
-8. [Next Steps](#next-steps)
-
 ---
 
 **Key Capabilities:**
